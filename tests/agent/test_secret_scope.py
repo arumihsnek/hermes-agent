@@ -1,4 +1,9 @@
 """Tests for the profile-scoped credential primitive (Workstream A / Phase 2)."""
+import logging
+import os
+import subprocess
+import sys
+
 import pytest
 
 from agent import secret_scope as ss
@@ -278,3 +283,110 @@ class TestEnvFileParsing:
         monkeypatch.setenv("OPENCODE_ZEN_API_KEY", "synthetic-provider-value")
 
         assert "OPENCODE_ZEN_API_KEY" not in build_subprocess_env()
+
+    def test_managed_cache_refreshes_and_invalidates(self, tmp_path, monkeypatch):
+        from hermes_cli import managed_scope
+
+        managed = tmp_path / "managed"
+        managed.mkdir()
+        env_path = managed / ".env"
+        monkeypatch.setenv("HERMES_MANAGED_DIR", str(managed))
+        managed_scope.invalidate_managed_cache()
+
+        env_path.write_text("OPENCODE_ZEN_API_KEY=first\n", encoding="utf-8")
+        assert managed_scope.load_managed_env()["OPENCODE_ZEN_API_KEY"] == "first"
+
+        env_path.write_text("OPENCODE_ZEN_API_KEY=second\n", encoding="utf-8")
+        stat = env_path.stat()
+        os.utime(env_path, ns=(stat.st_atime_ns, stat.st_mtime_ns + 1_000_000))
+        assert managed_scope.load_managed_env()["OPENCODE_ZEN_API_KEY"] == "second"
+
+        env_path.write_text("OPENCODE_ZEN_API_KEY=third\n", encoding="utf-8")
+        managed_scope.invalidate_managed_cache()
+        assert managed_scope.load_managed_env()["OPENCODE_ZEN_API_KEY"] == "third"
+
+    def test_managed_parse_exception_does_not_log_exception_value(
+        self, tmp_path, monkeypatch, caplog
+    ):
+        from hermes_cli import managed_scope
+
+        managed = tmp_path / "managed"
+        managed.mkdir()
+        (managed / ".env").write_text("synthetic\n", encoding="utf-8")
+        monkeypatch.setenv("HERMES_MANAGED_DIR", str(managed))
+        managed_scope.invalidate_managed_cache()
+
+        def raise_with_value(_file):
+            raise RuntimeError("synthetic-provider-value")
+
+        monkeypatch.setattr(managed_scope, "_parse_env", raise_with_value)
+        with caplog.at_level(logging.WARNING):
+            assert managed_scope.load_managed_env() == {}
+        assert "synthetic-provider-value" not in caplog.text
+
+    def test_scope_loader_exception_does_not_disclose_value(
+        self, tmp_path, monkeypatch, caplog
+    ):
+        from hermes_cli import managed_scope
+
+        root = tmp_path / "root"
+        profile = root / "profiles" / "worker"
+        profile.mkdir(parents=True)
+        monkeypatch.setenv("HERMES_MANAGED_PROFILES", "worker")
+        monkeypatch.setenv("HERMES_HOME", str(root))
+
+        def raise_with_value():
+            raise RuntimeError("synthetic-provider-value")
+
+        monkeypatch.setattr(managed_scope, "load_managed_env", raise_with_value)
+        with caplog.at_level(logging.WARNING):
+            assert ss.build_profile_secret_scope(profile) == {}
+        assert "synthetic-provider-value" not in caplog.text
+
+    def test_isolated_profile_scope_and_child_sanitization_end_to_end(
+        self, tmp_path, monkeypatch
+    ):
+        root = tmp_path / "root"
+        profile = root / "profiles" / "worker"
+        managed = tmp_path / "managed"
+        profile.mkdir(parents=True)
+        managed.mkdir()
+        (managed / ".env").write_text(
+            "OPENCODE_ZEN_API_KEY=synthetic-provider-value\n", encoding="utf-8"
+        )
+        monkeypatch.setenv("HERMES_MANAGED_DIR", str(managed))
+        monkeypatch.setenv("HERMES_MANAGED_PROFILES", "worker")
+        monkeypatch.setenv("HERMES_HOME", str(root))
+        from hermes_cli import env_loader, managed_scope
+        from tools.environments.local import build_subprocess_env
+
+        managed_scope.invalidate_managed_cache()
+        env_loader.reset_secret_source_cache()
+        env_loader.load_hermes_dotenv(hermes_home=profile)
+        scope = ss.build_profile_secret_scope(profile)
+        assert scope["OPENCODE_ZEN_API_KEY"] == "synthetic-provider-value"
+
+        token = ss.set_secret_scope(scope)
+        ss.set_multiplex_active(True)
+        try:
+            assert ss.get_secret("OPENCODE_ZEN_API_KEY") == "synthetic-provider-value"
+            child_env = build_subprocess_env()
+            assert "OPENCODE_ZEN_API_KEY" not in child_env
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    "-c",
+                    "import os; print('present' if os.getenv('OPENCODE_ZEN_API_KEY') else 'absent')",
+                ],
+                env=child_env,
+                capture_output=True,
+                text=True,
+                check=True,
+            )
+            assert result.stdout.strip() == "absent"
+        finally:
+            ss.reset_secret_scope(token)
+
+        assert not (profile / ".env").exists()
+        assert not list(profile.rglob("*.json"))
+        assert not list(profile.rglob("*.pickle"))
