@@ -105,3 +105,23 @@ def test_dispatcher_fails_closed_when_policy_preflight_is_missing(monkeypatch, t
         assert "provider policy" in str(error).lower()
     else:
         raise AssertionError("dispatcher must not spawn without the K8 policy artifact")
+
+
+def test_dispatcher_fails_closed_when_primary_and_fallback_are_unavailable(monkeypatch, tmp_path):
+    configured = policy()
+    configured["roles"]["worker"]["fallbacks"] = []
+    policy_path = tmp_path / "provider-policy.json"
+    policy_path.write_text(json.dumps(configured))
+    monkeypatch.setenv("HERMES_KANBAN_PROVIDER_POLICY", str(policy_path))
+    monkeypatch.setenv("HERMES_KANBAN_AVAILABLE_MODELS_JSON", json.dumps({"primary": [], "backup": []}))
+    monkeypatch.setenv("HERMES_KANBAN_CREDENTIAL_SOURCE_CLASS", "managed-provider")
+    monkeypatch.setattr(kb, "_resolve_hermes_argv", lambda: ["hermes"])
+    task_value = task("task-runtime-policy-unavailable")
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    try:
+        kb._default_spawn(task_value, str(workspace))
+    except RuntimeError as error:
+        assert "model_not_found" in str(error).lower()
+    else:
+        raise AssertionError("dispatcher must fail closed when no verified model is available")
