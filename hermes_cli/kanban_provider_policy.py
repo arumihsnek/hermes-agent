@@ -27,6 +27,7 @@ ERROR_TAXONOMY = {
     "POLICY_BLOCK": (False, "change the policy-bound request or profile explicitly"),
     "CONFIG_DIVERGENCE": (False, "reconcile the effective configuration with the policy snapshot"),
 }
+ADMIN_CREDENTIALS = {"gh_token", "github-token", "repository-admin", "repo-admin"}
 
 
 class ProviderPolicyError(ValueError):
@@ -107,7 +108,7 @@ def validate_policy(policy: Mapping[str, Any]) -> None:
         for candidate in fallbacks:
             if not isinstance(candidate, Mapping):
                 raise ValueError(f"fallback for role {role} must be an object")
-            if not {"provider", "model", "tier", "capability_class"} <= set(candidate):
+            if not {"provider", "model", "tier", "capability_class", "order"} <= set(candidate):
                 raise ValueError(f"fallback for role {role} is incomplete")
             if candidate["tier"] != role_data["tier"]:
                 raise ProviderPolicyError(
@@ -117,6 +118,23 @@ def validate_policy(policy: Mapping[str, Any]) -> None:
                     profile=str(role),
                     detail="fallback quality tier differs from role tier",
                 )
+        orders = [candidate.get("order") for candidate in fallbacks if isinstance(candidate, Mapping)]
+        if orders != list(range(1, len(orders) + 1)):
+            raise ValueError(f"fallbacks for role {role} must be ordered from 1")
+        seen = set()
+        for candidate in fallbacks:
+            key = (candidate.get("provider"), candidate.get("model"))
+            if key in seen:
+                raise ValueError(f"fallbacks for role {role} must be unique")
+            seen.add(key)
+            provider = providers.get(candidate.get("provider"))
+            if not isinstance(provider, Mapping):
+                raise ValueError(f"fallback for role {role} references an unknown provider")
+            configured_models = provider.get("configured_models")
+            if configured_models is not None and candidate.get("model") not in configured_models:
+                raise ValueError(f"fallback for role {role} references an unknown model")
+            if "fallback_to" in candidate or "next" in candidate or "fallbacks" in candidate:
+                raise ValueError(f"fallback for role {role} cannot contain a cycle graph")
     for profile, profile_data in profiles.items():
         if not isinstance(profile_data, Mapping):
             raise ValueError(f"profile {profile} must be an object")
@@ -129,12 +147,7 @@ def validate_policy(policy: Mapping[str, Any]) -> None:
             raise ValueError(f"profile {profile} capabilities must be unique")
         forbidden = {str(x).lower() for x in profile_data.get("forbidden_credentials", [])}
         credentials = {str(x).lower() for x in profile_data.get("credentials", [])}
-        if profile_data.get("role") == "worker" and credentials & {
-            "gh_token",
-            "github-token",
-            "repository-admin",
-            "repo-admin",
-        }:
+        if profile_data.get("role") != "human" and credentials & ADMIN_CREDENTIALS:
             raise ProviderPolicyError(
                 "AUTH_SCOPE_DENIED",
                 provider="policy",
@@ -178,6 +191,14 @@ def select_provider(
     if profile_data.get("role") != role or profile_data.get("tier") != role_data.get("tier"):
         raise _selection_error(
             "CONFIG_DIVERGENCE",
+            profile=profile,
+            provider=requested_provider,
+            model=requested_model,
+        )
+    configured_credential_source = profile_data.get("credential_source_class")
+    if configured_credential_source and configured_credential_source != credential_source_class:
+        raise _selection_error(
+            "AUTH_SCOPE_DENIED",
             profile=profile,
             provider=requested_provider,
             model=requested_model,
