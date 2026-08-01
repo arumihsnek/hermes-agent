@@ -1,5 +1,6 @@
 import importlib
 from dataclasses import asdict
+import json
 
 import pytest
 
@@ -226,3 +227,19 @@ def test_selection_contains_the_complete_audit_record():
         "role_tier": "cheap",
         "selection_reason": "requested primary is available",
     }
+
+
+def test_runtime_policy_loader_selects_from_secret_free_preflight(monkeypatch, tmp_path):
+    module = load_module()
+    path = tmp_path / "policy.json"
+    path.write_text(json.dumps(policy()))
+    selection = module.select_runtime_provider(
+        path,
+        profile="worker",
+        requested_provider="primary",
+        requested_model="cheap-model",
+        available_models_json=json.dumps({"primary": ["cheap-model"]}),
+        credential_source_class="managed-provider",
+    )
+    assert selection.effective_provider == "primary"
+    assert selection.fallback_used is False

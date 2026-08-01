@@ -8892,6 +8892,41 @@ def _default_spawn(
     from hermes_cli.profiles import normalize_profile_name
 
     profile_arg = normalize_profile_name(task.assignee)
+    provider_selection = None
+    spawn_model = task.model_override
+    spawn_provider = task.provider_override
+    policy_path = os.environ.get("HERMES_KANBAN_PROVIDER_POLICY")
+    if policy_path and (task.model_override or task.provider_override):
+        from hermes_cli.kanban_provider_policy import (
+            load_available_models,
+            load_policy_artifact,
+            select_provider,
+        )
+
+        try:
+            policy = load_policy_artifact(policy_path)
+            profile_data = policy.get("profiles", {}).get(profile_arg)
+            if not isinstance(profile_data, Mapping):
+                raise ValueError(f"profile {profile_arg} is absent from provider policy")
+            requested_provider = task.provider_override
+            if not requested_provider or not task.model_override:
+                raise ValueError("policy-bound overrides require both provider and model")
+            provider_selection = select_provider(
+                policy,
+                profile=profile_arg,
+                role=str(profile_data["role"]),
+                requested_provider=requested_provider,
+                requested_model=task.model_override,
+                available_models=load_available_models(os.environ.get("HERMES_KANBAN_AVAILABLE_MODELS_JSON")),
+                credential_source_class=os.environ.get(
+                    "HERMES_KANBAN_CREDENTIAL_SOURCE_CLASS",
+                    str(profile_data.get("credential_source_class", "")),
+                ),
+            )
+            spawn_model = provider_selection.effective_model
+            spawn_provider = provider_selection.effective_provider
+        except (OSError, ValueError, TypeError) as error:
+            raise RuntimeError(f"kanban provider policy preflight failed: {error}") from error
 
     prompt = f"work kanban task {task.id}"
     env = dict(os.environ)
@@ -9018,14 +9053,14 @@ def _default_spawn(
         for sk in task.skills:
             if sk:
                 cmd.extend(["--skills", sk])
-    if task.model_override:
-        cmd.extend(["-m", task.model_override])
+    if spawn_model:
+        cmd.extend(["-m", spawn_model])
         # Pin the provider too when the override names one, so the worker
         # resolves the model against the intended backend instead of the
         # profile's configured provider (mixing model X with provider Y is
         # the classic mis-set that stalls a board).
-        if task.provider_override:
-            cmd.extend(["--provider", task.provider_override])
+        if spawn_provider:
+            cmd.extend(["--provider", spawn_provider])
     worker_toolsets = _resolve_worker_cli_toolsets(env.get("HERMES_HOME"))
     if worker_toolsets:
         cmd.extend(["--toolsets", ",".join(worker_toolsets)])
@@ -9047,6 +9082,18 @@ def _default_spawn(
     log_dir = worker_logs_dir(board=board)
     log_dir.mkdir(parents=True, exist_ok=True)
     log_path = log_dir / f"{task.id}.log"
+    if policy_path:
+        env["HERMES_KANBAN_PROVIDER_SELECTION_AUDIT"] = str(
+            log_dir / f"{task.id}.provider-selection.json"
+        )
+    if provider_selection is not None:
+        from dataclasses import asdict
+
+        selection_audit = asdict(provider_selection)
+        selection_audit_path = Path(env["HERMES_KANBAN_PROVIDER_SELECTION_AUDIT"])
+        selection_audit_path.write_text(json.dumps(selection_audit, sort_keys=True) + "\n", encoding="utf-8")
+        env["HERMES_KANBAN_PROVIDER_SELECTION_JSON"] = json.dumps(selection_audit, sort_keys=True)
+        env["HERMES_KANBAN_PROVIDER_SELECTION_AUDIT"] = str(selection_audit_path)
     rotate_bytes, backup_count = worker_log_rotation_config()
     _rotate_worker_log(log_path, rotate_bytes, backup_count)
 

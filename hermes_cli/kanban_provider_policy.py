@@ -8,6 +8,8 @@ the returned selection is therefore deterministic and suitable for evidence.
 from __future__ import annotations
 
 from dataclasses import dataclass
+import json
+from pathlib import Path
 from typing import Any, Mapping
 
 
@@ -267,4 +269,71 @@ def select_provider(
         profile=profile,
         provider=requested_provider,
         model=requested_model,
+    )
+
+
+def load_policy_artifact(path: str | Path) -> Mapping[str, Any]:
+    """Load a materialized policy artifact without reading credentials."""
+
+    artifact = Path(path)
+    if not artifact.is_file() or artifact.is_symlink():
+        raise ValueError("provider policy artifact is missing or not a regular file")
+    try:
+        raw = artifact.read_text(encoding="utf-8")
+        try:
+            value = json.loads(raw)
+        except json.JSONDecodeError:
+            import yaml
+
+            value = yaml.safe_load(raw)
+    except (OSError, ValueError) as error:
+        raise ValueError("provider policy artifact is unreadable") from error
+    if not isinstance(value, Mapping):
+        raise ValueError("provider policy artifact must contain a mapping")
+    validate_policy(value)
+    return value
+
+
+def load_available_models(raw: str | None) -> dict[str, set[str]]:
+    """Parse a secret-free provider preflight result."""
+
+    if not raw:
+        raise ValueError("provider availability preflight is missing")
+    try:
+        value = json.loads(raw)
+    except json.JSONDecodeError as error:
+        raise ValueError("provider availability preflight is malformed") from error
+    if not isinstance(value, Mapping):
+        raise ValueError("provider availability preflight must be a mapping")
+    result: dict[str, set[str]] = {}
+    for provider, models in value.items():
+        if not isinstance(provider, str) or not isinstance(models, list) or not all(isinstance(model, str) for model in models):
+            raise ValueError("provider availability preflight is malformed")
+        result[provider] = set(models)
+    return result
+
+
+def select_runtime_provider(
+    policy_path: str | Path,
+    *,
+    profile: str,
+    requested_provider: str,
+    requested_model: str,
+    available_models_json: str | None,
+    credential_source_class: str,
+) -> ProviderSelection:
+    """Apply the same policy at a live Kanban worker boundary."""
+
+    policy = load_policy_artifact(policy_path)
+    profile_data = policy.get("profiles", {}).get(profile)
+    if not isinstance(profile_data, Mapping):
+        raise ValueError(f"profile {profile} is absent from provider policy")
+    return select_provider(
+        policy,
+        profile=profile,
+        role=str(profile_data["role"]),
+        requested_provider=requested_provider,
+        requested_model=requested_model,
+        available_models=load_available_models(available_models_json),
+        credential_source_class=credential_source_class,
     )
