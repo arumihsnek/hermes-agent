@@ -99,6 +99,28 @@ def validate_policy(policy: Mapping[str, Any]) -> None:
     providers = policy.get("providers")
     if not isinstance(roles, Mapping) or not isinstance(profiles, Mapping) or not isinstance(providers, Mapping):
         raise ValueError("policy requires roles, profiles, and providers mappings")
+    for provider_name, provider_data in providers.items():
+        if not isinstance(provider_data, Mapping):
+            raise ValueError(f"provider {provider_name} must be an object")
+        status = provider_data.get("availability_status")
+        if status is not None and status not in {"active", "inactive-unproven"}:
+            raise ValueError(f"provider {provider_name} has an unknown availability status")
+        if status == "inactive-unproven" and provider_data.get("routable") is not False:
+            raise ProviderPolicyError(
+                "POLICY_BLOCK",
+                provider="policy",
+                model="policy",
+                profile="policy",
+                detail="inactive provider must be non-routable",
+            )
+        if status == "active" and provider_data.get("routable") is not True:
+            raise ProviderPolicyError(
+                "CONFIG_DIVERGENCE",
+                provider="policy",
+                model="policy",
+                profile="policy",
+                detail="active provider must be routable",
+            )
     for role, role_data in roles.items():
         if not isinstance(role_data, Mapping) or role_data.get("tier") not in TIERS:
             raise ValueError(f"invalid tier for role {role}")
@@ -219,6 +241,14 @@ def select_provider(
             profile=profile,
             provider=requested_provider,
             model=requested_model,
+        )
+    if provider_data.get("availability_status") == "inactive-unproven" or provider_data.get("routable") is False:
+        raise _selection_error(
+            "POLICY_BLOCK",
+            profile=profile,
+            provider=requested_provider,
+            model=requested_model,
+            detail="provider is inactive or explicitly non-routable",
         )
     capability_class = provider_data.get("capability_class")
     if capability_class != required_capability:

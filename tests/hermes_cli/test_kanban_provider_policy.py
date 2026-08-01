@@ -192,6 +192,25 @@ def test_credential_source_class_must_match_the_profile_policy():
     assert error.value.code == "AUTH_SCOPE_DENIED"
 
 
+def test_inactive_unproven_provider_is_not_routable():
+    module = load_module()
+    p = policy()
+    p["providers"]["primary"].update(
+        {"availability_status": "inactive-unproven", "routable": False}
+    )
+    with pytest.raises(module.ProviderPolicyError) as error:
+        module.select_provider(
+            p,
+            profile="worker",
+            role="worker",
+            requested_provider="primary",
+            requested_model="cheap-model",
+            available_models={"primary": {"cheap-model"}},
+            credential_source_class="managed-provider",
+        )
+    assert error.value.code == "POLICY_BLOCK"
+
+
 def test_malformed_fallback_is_rejected_before_selection():
     module = load_module()
     p = policy()
