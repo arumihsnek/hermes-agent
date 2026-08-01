@@ -155,3 +155,126 @@ class TestEnvFileParsing:
         )
 
         assert ss.build_profile_secret_scope(profile) == {}
+
+    def test_build_profile_secret_scope_includes_managed_environment(
+        self, tmp_path, monkeypatch
+    ):
+        """Multiplexed profiles inherit the central managed provider env."""
+        root = tmp_path / "root"
+        profile = root / "profiles" / "worker"
+        managed = tmp_path / "managed"
+        profile.mkdir(parents=True)
+        managed.mkdir()
+        (managed / ".env").write_text(
+            "OPENCODE_ZEN_API_KEY=central-zen\n"
+            "OPENCODE_GO_API_KEY=central-go\n",
+            encoding="utf-8",
+        )
+        monkeypatch.setenv("HERMES_MANAGED_DIR", str(managed))
+        monkeypatch.setenv("HERMES_MANAGED_PROFILES", "worker")
+        monkeypatch.setenv("HERMES_HOME", str(root))
+        from hermes_cli import managed_scope
+        from hermes_cli import env_loader
+
+        managed_scope.invalidate_managed_cache()
+        env_loader.reset_secret_source_cache()
+        env_loader.load_hermes_dotenv(hermes_home=profile)
+
+        assert ss.build_profile_secret_scope(profile) == {
+            "OPENCODE_ZEN_API_KEY": "central-zen",
+            "OPENCODE_GO_API_KEY": "central-go",
+        }
+
+    def test_managed_scope_requires_authorized_profile_and_provider_name(
+        self, tmp_path, monkeypatch
+    ):
+        root = tmp_path / "root"
+        profile = root / "profiles" / "worker"
+        managed = tmp_path / "managed"
+        managed.mkdir()
+        profile.mkdir(parents=True)
+        (managed / ".env").write_text(
+            "OPENCODE_ZEN_API_KEY=central-zen\nUNRELATED_SECRET=must-not-enter\n",
+            encoding="utf-8",
+        )
+        monkeypatch.setenv("HERMES_MANAGED_DIR", str(managed))
+        monkeypatch.setenv("HERMES_MANAGED_PROFILES", "worker")
+        monkeypatch.setenv("HERMES_HOME", str(root))
+        from hermes_cli import managed_scope
+
+        managed_scope.invalidate_managed_cache()
+
+        assert ss.build_profile_secret_scope(profile) == {
+            "OPENCODE_ZEN_API_KEY": "central-zen"
+        }
+        reviewer = root / "profiles" / "reviewer"
+        assert ss.build_profile_secret_scope(reviewer) == {}
+
+    def test_managed_scope_precedence_is_deterministic(self, tmp_path, monkeypatch):
+        root = tmp_path / "root"
+        profile = root / "profiles" / "worker"
+        managed = tmp_path / "managed"
+        profile.mkdir(parents=True)
+        managed.mkdir()
+        (profile / ".env").write_text(
+            "OPENCODE_ZEN_API_KEY=profile\n", encoding="utf-8"
+        )
+        (managed / ".env").write_text(
+            "OPENCODE_ZEN_API_KEY=managed\n", encoding="utf-8"
+        )
+        monkeypatch.setenv("OPENCODE_ZEN_API_KEY", "process")
+        monkeypatch.setenv("HERMES_MANAGED_DIR", str(managed))
+        monkeypatch.setenv("HERMES_MANAGED_PROFILES", "worker")
+        monkeypatch.setenv("HERMES_HOME", str(root))
+        from hermes_cli import env_loader, managed_scope
+
+        managed_scope.invalidate_managed_cache()
+        env_loader.reset_secret_source_cache()
+        env_loader.load_hermes_dotenv(hermes_home=profile)
+
+        scope = ss.build_profile_secret_scope(profile)
+        assert scope["OPENCODE_ZEN_API_KEY"] == "managed"
+
+    def test_managed_scope_does_not_copy_or_log_secret_values(
+        self, tmp_path, monkeypatch, caplog
+    ):
+        root = tmp_path / "root"
+        profile = root / "profiles" / "worker"
+        managed = tmp_path / "managed"
+        managed.mkdir()
+        profile.mkdir(parents=True)
+        (managed / ".env").write_text(
+            "OPENCODE_ZEN_API_KEY=central-zen\n", encoding="utf-8"
+        )
+        monkeypatch.setenv("HERMES_MANAGED_DIR", str(managed))
+        monkeypatch.setenv("HERMES_MANAGED_PROFILES", "worker")
+        monkeypatch.setenv("HERMES_HOME", str(root))
+        from hermes_cli import managed_scope
+
+        managed_scope.invalidate_managed_cache()
+        ss.build_profile_secret_scope(profile)
+
+        assert not (profile / ".env").exists()
+        assert "central-zen" not in caplog.text
+
+    def test_invalid_managed_dir_fails_closed(self, tmp_path, monkeypatch):
+        root = tmp_path / "root"
+        profile = root / "profiles" / "worker"
+        managed = tmp_path / "missing-managed"
+        monkeypatch.setenv("HERMES_MANAGED_DIR", str(managed))
+        monkeypatch.setenv("HERMES_MANAGED_PROFILES", "worker")
+        monkeypatch.setenv("HERMES_HOME", str(root))
+        from hermes_cli import managed_scope
+
+        managed_scope.invalidate_managed_cache()
+
+        assert ss.build_profile_secret_scope(profile) == {}
+
+    def test_managed_provider_secret_is_removed_from_unrelated_child_env(
+        self, monkeypatch
+    ):
+        from tools.environments.local import build_subprocess_env
+
+        monkeypatch.setenv("OPENCODE_ZEN_API_KEY", "synthetic-provider-value")
+
+        assert "OPENCODE_ZEN_API_KEY" not in build_subprocess_env()
