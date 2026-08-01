@@ -125,3 +125,22 @@ def test_dispatcher_fails_closed_when_primary_and_fallback_are_unavailable(monke
         assert "model_not_found" in str(error).lower()
     else:
         raise AssertionError("dispatcher must fail closed when no verified model is available")
+
+
+def test_worker_cli_route_applies_policy_to_default_provider_selection(monkeypatch, tmp_path):
+    policy_path = tmp_path / "provider-policy.json"
+    policy_path.write_text(json.dumps(policy()))
+    audit_path = tmp_path / "selection.json"
+    monkeypatch.setenv("HERMES_KANBAN_TASK", "task-runtime-cli")
+    monkeypatch.setenv("HERMES_PROFILE", "worker")
+    monkeypatch.setenv("HERMES_KANBAN_PROVIDER_POLICY", str(policy_path))
+    monkeypatch.setenv("HERMES_KANBAN_AVAILABLE_MODELS_JSON", json.dumps({"primary": [], "backup": ["cheap-backup"]}))
+    monkeypatch.setenv("HERMES_KANBAN_CREDENTIAL_SOURCE_CLASS", "managed-provider")
+    monkeypatch.setenv("HERMES_KANBAN_PROVIDER_SELECTION_AUDIT", str(audit_path))
+    from cli import HermesCLI
+
+    shell = HermesCLI(model="cheap-primary", provider="primary", compact=True, max_turns=1)
+    assert shell.requested_provider == "backup"
+    assert shell.provider == "backup"
+    assert shell.model == "cheap-backup"
+    assert json.loads(audit_path.read_text())["effective_provider"] == "backup"
