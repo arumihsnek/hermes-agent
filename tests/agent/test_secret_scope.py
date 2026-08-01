@@ -190,6 +190,29 @@ class TestEnvFileParsing:
             "OPENCODE_GO_API_KEY": "central-go",
         }
 
+    def test_managed_scope_uses_profile_path_when_spawn_sets_profile_home(
+        self, tmp_path, monkeypatch
+    ):
+        """The official Kanban spawn path sets HERMES_HOME to the profile dir."""
+        root = tmp_path / "root"
+        profile = root / "profiles" / "worker"
+        managed = tmp_path / "managed"
+        profile.mkdir(parents=True)
+        managed.mkdir()
+        (managed / ".env").write_text(
+            "OPENCODE_ZEN_API_KEY=central-zen\n", encoding="utf-8"
+        )
+        monkeypatch.setenv("HERMES_HOME", str(profile))
+        monkeypatch.setenv("HERMES_MANAGED_DIR", str(managed))
+        monkeypatch.setenv("HERMES_MANAGED_PROFILES", "worker")
+        from hermes_cli import managed_scope
+
+        managed_scope.invalidate_managed_cache()
+
+        assert ss.build_profile_secret_scope(profile) == {
+            "OPENCODE_ZEN_API_KEY": "central-zen"
+        }
+
     def test_managed_scope_requires_authorized_profile_and_provider_name(
         self, tmp_path, monkeypatch
     ):

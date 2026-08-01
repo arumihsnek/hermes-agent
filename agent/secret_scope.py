@@ -214,9 +214,9 @@ def load_env_file(env_path: Path) -> Dict[str, str]:
 def _managed_profile_name(home: Path) -> str | None:
     """Resolve the launcher-authorized profile identity from active home."""
     try:
-        from hermes_constants import get_hermes_home
+        from hermes_constants import get_default_hermes_root
 
-        root = Path(get_hermes_home()).resolve()
+        root = Path(get_default_hermes_root()).resolve()
         resolved = home.resolve()
         if resolved == root:
             return "default"
