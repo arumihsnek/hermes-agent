@@ -100,11 +100,14 @@ def _cached_read(path: Path, cache: Dict[str, tuple], parse):
         with open(path, encoding="utf-8") as f:
             parsed = parse(f)
     except Exception as exc:  # noqa: BLE001 — fail-open, but LOUD
+        # Do not include the exception message: parser failures can contain a
+        # value from the managed file, and managed scope diagnostics must never
+        # turn that value into a log disclosure.
         logger.warning(
-            "managed scope: failed to parse %s: %s — IGNORING this managed file. "
+            "managed scope: failed to parse %s (%s) — IGNORING this managed file. "
             "Admin policy from this file is NOT being applied. Fix and restart.",
             path,
-            exc,
+            type(exc).__name__,
         )
         return None
     with _CACHE_LOCK:
