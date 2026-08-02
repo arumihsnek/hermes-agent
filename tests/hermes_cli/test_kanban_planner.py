@@ -50,6 +50,21 @@ def test_valid_envelope_dry_run_is_byte_stable_and_read_only():
     assert first["lifecycle_mutations"] == 0
 
 
+def test_dry_run_projects_next_role_frontier_after_completed_subtasks():
+    projection = scheduler_dry_run(_envelope(), completed_subtasks={"build"})
+
+    assert projection["completed"] == ["build"]
+    assert projection["ready_workers"] == []
+    assert projection["ready_reviewers"] == ["review"]
+    assert projection["not_yet_runnable"] == []
+    assert projection["provider_calls"] == 0
+
+
+def test_dry_run_rejects_unknown_completed_subtask():
+    with pytest.raises(PlannerValidationError, match="unknown completed subtask"):
+        scheduler_dry_run(_envelope(), completed_subtasks={"missing"})
+
+
 def test_invalid_envelope_is_rejected_before_any_import_commit():
     ledger = PlannerLedger()
     before = ledger.snapshot()
