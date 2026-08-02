@@ -40,6 +40,26 @@ class PlannerImportResult:
         }
 
 
+@dataclass(frozen=True)
+class PlannerActivationResult:
+    """Durable scheduler projection result for one explicit import."""
+
+    status: str
+    import_id: str
+    board: str | None
+    promoted_task_ids: tuple[str, ...] = ()
+    error_code: str | None = None
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "status": self.status,
+            "import_id": self.import_id,
+            "board": self.board,
+            "promoted_task_ids": list(self.promoted_task_ids),
+            "error_code": self.error_code,
+        }
+
+
 class _Rejected(Exception):
     def __init__(self, code: str):
         self.code = code
@@ -268,4 +288,77 @@ def import_planner_envelope(
         board=normalized_board,
         fingerprint=fingerprint,
         task_map=task_map,
+    )
+
+
+def activate_planner_import(
+    conn,
+    *,
+    import_id: str,
+    board: str | None,
+) -> PlannerActivationResult:
+    """Promote only this import's dependency frontier to ``ready``.
+
+    Activation is an explicit scheduler boundary. It never claims, spawns, or
+    dispatches a task and is idempotent after the frontier has been promoted.
+    Parent completion is read from durable task status, so a new process can
+    reconstruct the same frontier without in-memory planner state.
+    """
+    normalized_import_id = import_id.strip() if isinstance(import_id, str) else ""
+    if not normalized_import_id:
+        return PlannerActivationResult("rejected", "", board, error_code="IMPORT_ID_REQUIRED")
+    try:
+        normalized_board, _ = _resolve_destination(board, None)
+    except _Rejected as exc:
+        return PlannerActivationResult("rejected", normalized_import_id, board, error_code=exc.code)
+    row = conn.execute(
+        "SELECT status FROM kanban_planner_imports WHERE board = ? AND import_id = ?",
+        (normalized_board, normalized_import_id),
+    ).fetchone()
+    if row is None:
+        return PlannerActivationResult(
+            "rejected", normalized_import_id, normalized_board, error_code="IMPORT_NOT_FOUND"
+        )
+    if row["status"] != "committed":
+        return PlannerActivationResult(
+            "rejected", normalized_import_id, normalized_board, error_code="IMPORT_NOT_COMMITTED"
+        )
+
+    promoted: list[str] = []
+    with kb.write_txn(conn):
+        mappings = conn.execute(
+            "SELECT planner_task_id, task_id FROM kanban_planner_task_map "
+            "WHERE board = ? AND import_id = ? ORDER BY planner_task_id",
+            (normalized_board, normalized_import_id),
+        ).fetchall()
+        for mapping in mappings:
+            task_id = mapping["task_id"]
+            task = conn.execute("SELECT status FROM tasks WHERE id = ?", (task_id,)).fetchone()
+            if task is None or task["status"] != "todo":
+                continue
+            parents = conn.execute(
+                "SELECT parent.status FROM task_links link "
+                "JOIN tasks parent ON parent.id = link.parent_id "
+                "WHERE link.child_id = ? ORDER BY link.parent_id",
+                (task_id,),
+            ).fetchall()
+            if not all(parent["status"] in {"done", "archived"} for parent in parents):
+                continue
+            changed = conn.execute(
+                "UPDATE tasks SET status = 'ready' WHERE id = ? AND status = 'todo'",
+                (task_id,),
+            ).rowcount
+            if changed:
+                kb._append_event(
+                    conn,
+                    task_id,
+                    "promoted",
+                    {"source": "planner-activate", "import_id": normalized_import_id},
+                )
+                promoted.append(task_id)
+    return PlannerActivationResult(
+        "activated" if promoted else "already-active",
+        normalized_import_id,
+        normalized_board,
+        tuple(promoted),
     )

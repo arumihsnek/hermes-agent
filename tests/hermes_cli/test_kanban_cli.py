@@ -90,6 +90,33 @@ def test_durable_import_cli_rejects_symlinked_envelope(tmp_path, monkeypatch):
     assert kc.kanban_command(args) == 2
 
 
+def test_durable_activation_cli_is_explicit_and_idempotent(tmp_path, monkeypatch, capsys):
+    home = tmp_path / ".hermes"
+    home.mkdir()
+    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setattr(Path, "home", lambda: tmp_path)
+    envelope = tmp_path / "plan.json"
+    envelope.write_text(json.dumps(_durable_import_envelope()), encoding="utf-8")
+    parser = argparse.ArgumentParser(prog="hermes", add_help=False)
+    sub = parser.add_subparsers(dest="command")
+    kc.build_parser(sub)
+    imported = parser.parse_args([
+        "kanban", "--board", "default", "import", str(envelope), "--import-id", "i-2", "--json"
+    ])
+    assert kc.kanban_command(imported) == 0
+    capsys.readouterr()
+    activated = parser.parse_args([
+        "kanban", "--board", "default", "activate", "--import-id", "i-2", "--json"
+    ])
+    assert kc.kanban_command(activated) == 0
+    assert json.loads(capsys.readouterr().out)["status"] == "activated"
+    again = parser.parse_args([
+        "kanban", "--board", "default", "activate", "--import-id", "i-2", "--json"
+    ])
+    assert kc.kanban_command(again) == 0
+    assert json.loads(capsys.readouterr().out)["status"] == "already-active"
+
+
 # ---------------------------------------------------------------------------
 # Workspace flag parsing
 # ---------------------------------------------------------------------------
@@ -230,4 +257,3 @@ def test_run_slash_reclaim_running_task(kanban_home):
 # ---------------------------------------------------------------------------
 # /kanban help / no-args / unknown-action UX (issue #21794)
 # ---------------------------------------------------------------------------
-

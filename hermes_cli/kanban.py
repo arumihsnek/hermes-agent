@@ -280,6 +280,17 @@ def build_parser(parent_subparsers: argparse._SubParsersAction) -> argparse.Argu
     p_import.add_argument("--created-by", default="planner-import", help="Audit author for the import record")
     p_import.add_argument("--json", action="store_true", help="Emit the structured import result as JSON")
 
+    p_activate = sub.add_parser(
+        "activate",
+        help="Explicitly promote the durable frontier of one planner import",
+        description=(
+            "Promote todo tasks belonging to one committed import when all "
+            "durable parents are done or archived. This never dispatches workers."
+        ),
+    )
+    p_activate.add_argument("--import-id", required=True, help="Stable import identity to activate")
+    p_activate.add_argument("--json", action="store_true", help="Emit the structured activation result as JSON")
+
     # --- boards (new in v2: multi-project support) ---
     p_boards = sub.add_parser(
         "boards",
@@ -1026,6 +1037,8 @@ def kanban_command(args: argparse.Namespace) -> int:
     # current-board fallback before that requirement is checked.
     if action == "import":
         return _cmd_import(args)
+    if action == "activate":
+        return _cmd_activate(args)
 
     # Board-management commands operate on board metadata and the persisted
     # current-board pointer itself. They must ignore the shared `--board`
@@ -1219,6 +1232,43 @@ def _cmd_import(args: argparse.Namespace) -> int:
         if result.error_code:
             print(f"planner error: {result.error_code}", file=sys.stderr)
     return 0 if result.status in {"created", "already-imported"} else 1
+
+
+def _cmd_activate(args: argparse.Namespace) -> int:
+    """Explicitly promote an imported frontier without dispatching it."""
+    board = getattr(args, "board", None)
+    if not board:
+        print("planner: activation requires explicit --board", file=sys.stderr)
+        return 2
+    try:
+        board = kb._normalize_board_slug(board)
+    except ValueError as exc:
+        print(f"planner: invalid board: {exc}", file=sys.stderr)
+        return 2
+    if not board:
+        print("planner: activation requires explicit --board", file=sys.stderr)
+        return 2
+    if board != kb.DEFAULT_BOARD and not kb.board_exists(board):
+        print(f"planner: board {board!r} does not exist; create it explicitly first", file=sys.stderr)
+        return 1
+    try:
+        from hermes_cli.kanban_planner_import import activate_planner_import
+
+        kb.init_db(board=board)
+        with kb.connect_closing(board=board) as conn:
+            result = activate_planner_import(conn, import_id=args.import_id, board=board)
+    except (OSError, ValueError, RuntimeError) as exc:
+        print(f"planner: activation failed: {exc}", file=sys.stderr)
+        return 1
+    if getattr(args, "json", False):
+        print(json.dumps(result.to_dict(), sort_keys=True, ensure_ascii=False))
+    else:
+        print(f"planner activation: {result.status} ({result.import_id})")
+        for task_id in result.promoted_task_ids:
+            print(f"ready: {task_id}")
+        if result.error_code:
+            print(f"planner error: {result.error_code}", file=sys.stderr)
+    return 0 if result.status in {"activated", "already-active"} else 1
 
 def _profile_author() -> str:
     """Best-effort author name for an interactive CLI call."""

@@ -3,7 +3,7 @@
 import json
 
 from hermes_cli import kanban_db as kb
-from hermes_cli.kanban_planner_import import import_planner_envelope
+from hermes_cli.kanban_planner_import import activate_planner_import, import_planner_envelope
 
 
 def _envelope():
@@ -113,3 +113,28 @@ def test_missing_explicit_board_is_rejected_before_writes(tmp_path):
         assert result.status == "rejected"
         assert result.error_code == "BOARD_REQUIRED"
         assert _counts(conn)["tasks"] == 0
+
+
+def test_activation_reconstructs_frontier_after_reopen_without_dispatch(tmp_path):
+    db_path = tmp_path / "activation.db"
+    kb.init_db(db_path=db_path)
+    with kb.connect(db_path=db_path) as conn:
+        imported = import_planner_envelope(conn, _envelope(), import_id="activate", board="default")
+        first = activate_planner_import(conn, import_id="activate", board="default")
+        assert first.status == "activated"
+        root_id = imported.task_map["build"]
+        child_id = imported.task_map["review"]
+        assert conn.execute("SELECT status FROM tasks WHERE id = ?", (root_id,)).fetchone()[0] == "ready"
+        assert conn.execute("SELECT status FROM tasks WHERE id = ?", (child_id,)).fetchone()[0] == "todo"
+
+    # A fresh connection is the recovery boundary; no in-memory planner state
+    # is supplied to reconstruct the frontier.
+    with kb.connect(db_path=db_path) as conn:
+        conn.execute("UPDATE tasks SET status = 'done' WHERE id = ?", (root_id,))
+        second = activate_planner_import(conn, import_id="activate", board="default")
+        assert second.status == "activated"
+        assert second.promoted_task_ids == (child_id,)
+        third = activate_planner_import(conn, import_id="activate", board="default")
+        assert third.status == "already-active"
+        assert conn.execute("SELECT status FROM tasks WHERE id = ?", (child_id,)).fetchone()[0] == "ready"
+        assert conn.execute("SELECT COUNT(*) FROM task_events WHERE kind = 'promoted'").fetchone()[0] == 2
