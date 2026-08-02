@@ -250,6 +250,20 @@ def build_parser(parent_subparsers: argparse._SubParsersAction) -> argparse.Argu
     # --- init ---
     sub.add_parser("init", help="Create kanban.db if missing (idempotent)")
 
+    # --- planner dry-run ---
+    p_plan = sub.add_parser(
+        "plan",
+        help="Validate a planner-dag/v1 envelope and print a read-only scheduler projection",
+    )
+    p_plan.add_argument("path", metavar="ENVELOPE", help="Path to a planner-dag/v1 JSON envelope")
+    p_plan.add_argument(
+        "--dry-run",
+        action="store_true",
+        required=True,
+        help="Required explicit acknowledgement that this command performs no import or lifecycle mutation",
+    )
+    p_plan.add_argument("--json", action="store_true", help="Emit the scheduler projection as JSON")
+
     # --- boards (new in v2: multi-project support) ---
     p_boards = sub.add_parser(
         "boards",
@@ -986,6 +1000,11 @@ def kanban_command(args: argparse.Namespace) -> int:
         )
         return 1
 
+    # Planner projection is intentionally handled before board resolution and
+    # DB initialization: it is a pure file read and must remain lifecycle-free.
+    if action == "plan":
+        return _cmd_plan(args)
+
     # Board-management commands operate on board metadata and the persisted
     # current-board pointer itself. They must ignore the shared `--board`
     # task-routing override; otherwise `/kanban --board beta boards show`
@@ -1099,6 +1118,31 @@ def kanban_command(args: argparse.Namespace) -> int:
 # ---------------------------------------------------------------------------
 # Handlers
 # ---------------------------------------------------------------------------
+
+def _cmd_plan(args: argparse.Namespace) -> int:
+    """Validate and project a planner envelope without touching Kanban state."""
+    path = Path(args.path)
+    if path.is_symlink() or not path.is_file():
+        print(f"planner: envelope must be a regular file: {path}", file=sys.stderr)
+        return 2
+    try:
+        envelope = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        print(f"planner: cannot read envelope: {exc}", file=sys.stderr)
+        return 2
+    try:
+        from hermes_cli.kanban_planner import PlannerValidationError, scheduler_dry_run
+
+        projection = scheduler_dry_run(envelope)
+    except PlannerValidationError as exc:
+        print(f"planner: invalid envelope: {exc}", file=sys.stderr)
+        return 2
+    if getattr(args, "json", False):
+        print(json.dumps(projection, indent=2, sort_keys=True, ensure_ascii=False))
+    else:
+        for key in ("ready_workers", "ready_reviewers", "ready_closers", "blocked", "not_yet_runnable", "batch_candidates", "policy_violations"):
+            print(f"{key}: {json.dumps(projection[key], sort_keys=True)}")
+    return 0
 
 def _profile_author() -> str:
     """Best-effort author name for an interactive CLI call."""

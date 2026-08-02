@@ -1,9 +1,13 @@
 """Offline contract tests for the K9 planner envelope and scheduler dry-run."""
 
 import json
+from argparse import ArgumentParser
+from pathlib import Path
 
 import pytest
 
+from hermes_cli import kanban as kanban_cli
+from hermes_cli import kanban_db
 from hermes_cli.kanban_planner import (
     PlannerLedger,
     PlannerMetrics,
@@ -122,3 +126,36 @@ def test_call_metrics_record_supplied_fields_without_inventing_cost():
         ],
         "absolute_cost": None,
     }
+
+
+def test_plan_cli_dry_run_reads_envelope_without_initializing_database(tmp_path, monkeypatch, capsys):
+    envelope_path = tmp_path / "planner.json"
+    envelope_path.write_text(json.dumps(_envelope()), encoding="utf-8")
+
+    def unexpected_db_init():
+        raise AssertionError("read-only planner dry-run must not initialize the database")
+
+    monkeypatch.setattr(kanban_db, "init_db", unexpected_db_init)
+    parser = ArgumentParser(add_help=False)
+    sub = parser.add_subparsers(dest="command")
+    kanban_cli.build_parser(sub)
+    args = parser.parse_args(["kanban", "plan", str(envelope_path), "--dry-run", "--json"])
+
+    assert kanban_cli.kanban_command(args) == 0
+    result = json.loads(capsys.readouterr().out)
+    assert result["ready_workers"] == ["build"]
+    assert result["provider_calls"] == 0
+    assert result["lifecycle_mutations"] == 0
+
+
+def test_plan_cli_rejects_malformed_envelope_without_db_access(tmp_path, monkeypatch, capsys):
+    envelope_path = tmp_path / "malformed.json"
+    envelope_path.write_text("{not-json", encoding="utf-8")
+    monkeypatch.setattr(kanban_db, "init_db", lambda: pytest.fail("database must not be touched"))
+    parser = ArgumentParser(add_help=False)
+    sub = parser.add_subparsers(dest="command")
+    kanban_cli.build_parser(sub)
+    args = parser.parse_args(["kanban", "plan", str(envelope_path), "--dry-run", "--json"])
+
+    assert kanban_cli.kanban_command(args) == 2
+    assert "planner" in capsys.readouterr().err.lower()
