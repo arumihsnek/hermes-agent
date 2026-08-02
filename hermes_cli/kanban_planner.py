@@ -9,11 +9,42 @@ from __future__ import annotations
 
 from copy import deepcopy
 from dataclasses import dataclass, field
+import json
 from typing import Any, Mapping
 
 
 class PlannerValidationError(ValueError):
     """Raised when a planner envelope cannot be imported atomically."""
+
+
+@dataclass(frozen=True)
+class PlannerTaskSpec:
+    """Immutable persistence input for one validated planner subtask."""
+
+    id: str
+    title: str
+    role: str
+    estimated_model_tier: str
+    risk_classification: str
+    acceptance_json: str
+    review_policy_json: str
+    evidence_expectations_json: str
+
+
+@dataclass(frozen=True)
+class PlannerLinkSpec:
+    """Immutable parent-to-child relationship for a planner graph."""
+
+    parent_id: str
+    child_id: str
+
+
+@dataclass(frozen=True)
+class PlannerTaskSpecs:
+    """Pure, deterministic task and link inputs for a later durable adapter."""
+
+    tasks: tuple[PlannerTaskSpec, ...]
+    links: tuple[PlannerLinkSpec, ...]
 
 
 _REQUIRED_FIELDS = {
@@ -136,6 +167,45 @@ def _validate_envelope(envelope: Mapping[str, Any]) -> dict[str, Any]:
     if not isinstance(envelope["batch_groups"], list):
         raise PlannerValidationError("batch_groups must be an array")
     return deepcopy(dict(envelope))
+
+
+def _canonical_json(value: Any) -> str:
+    return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+
+
+def materialize_task_specs(envelope: Mapping[str, Any]) -> PlannerTaskSpecs:
+    """Convert a valid envelope into immutable, deterministic task/link specs.
+
+    This function deliberately stops before persistence. It does not resolve
+    profiles or workspaces, generate durable IDs, emit events, or access any
+    external service. Those semantics belong to a separately specified import
+    boundary.
+    """
+
+    canonical = _validate_envelope(envelope)
+    tasks = tuple(
+        PlannerTaskSpec(
+            id=task["id"],
+            title=task["title"],
+            role=task["role"],
+            estimated_model_tier=canonical["estimated_model_tier"][task["id"]],
+            risk_classification=canonical["risk_classification"][task["id"]],
+            acceptance_json=_canonical_json(canonical["acceptance"][task["id"]]),
+            review_policy_json=_canonical_json(canonical["review_policy"][task["id"]]),
+            evidence_expectations_json=_canonical_json(
+                canonical["evidence_expectations"][task["id"]]
+            ),
+        )
+        for task in canonical["subtasks"]
+    )
+    links = tuple(
+        PlannerLinkSpec(
+            parent_id=dependency["depends_on"],
+            child_id=dependency["subtask_id"],
+        )
+        for dependency in canonical["dependencies"]
+    )
+    return PlannerTaskSpecs(tasks=tasks, links=links)
 
 
 def scheduler_dry_run(
