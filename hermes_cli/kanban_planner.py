@@ -138,18 +138,43 @@ def _validate_envelope(envelope: Mapping[str, Any]) -> dict[str, Any]:
     return deepcopy(dict(envelope))
 
 
-def scheduler_dry_run(envelope: Mapping[str, Any]) -> dict[str, Any]:
-    """Return a stable scheduler projection without mutation or external calls."""
+def scheduler_dry_run(
+    envelope: Mapping[str, Any],
+    *,
+    completed_subtasks: set[str] | None = None,
+) -> dict[str, Any]:
+    """Return a stable scheduler projection without mutation or external calls.
+
+    ``completed_subtasks`` is an explicit caller-supplied runtime snapshot. It
+    is never inferred from a database or provider and is validated against the
+    envelope before it affects the runnable frontier.
+    """
 
     canonical = _validate_envelope(envelope)
     tasks = canonical["subtasks"]
     task_by_id = {task["id"]: task for task in tasks}
+    completed = set(completed_subtasks or ())
+    unknown_completed = completed - set(task_by_id)
+    if unknown_completed:
+        raise PlannerValidationError(
+            f"unknown completed subtask: {sorted(unknown_completed)[0]}"
+        )
     dependencies = {task_id: [] for task_id in task_by_id}
     for dependency in canonical["dependencies"]:
         dependencies[dependency["subtask_id"]].append(dependency["depends_on"])
-    ready = [task_id for task_id in task_by_id if not dependencies[task_id]]
-    not_yet_runnable = [task_id for task_id in task_by_id if dependencies[task_id]]
+    ready = [
+        task_id
+        for task_id in task_by_id
+        if task_id not in completed
+        and all(parent in completed for parent in dependencies[task_id])
+    ]
+    not_yet_runnable = [
+        task_id
+        for task_id in task_by_id
+        if task_id not in completed and task_id not in ready
+    ]
     result = {
+        "completed": [task_id for task_id in task_by_id if task_id in completed],
         "ready_workers": [task_id for task_id in ready if task_by_id[task_id]["role"] == "worker"],
         "ready_reviewers": [task_id for task_id in ready if task_by_id[task_id]["role"] == "reviewer"],
         "ready_closers": [task_id for task_id in ready if task_by_id[task_id]["role"] == "closer"],
