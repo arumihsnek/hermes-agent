@@ -12,6 +12,7 @@ from hermes_cli.kanban_planner import (
     PlannerLedger,
     PlannerMetrics,
     PlannerValidationError,
+    materialize_task_specs,
     scheduler_dry_run,
 )
 
@@ -63,6 +64,27 @@ def test_dry_run_projects_next_role_frontier_after_completed_subtasks():
 def test_dry_run_rejects_unknown_completed_subtask():
     with pytest.raises(PlannerValidationError, match="unknown completed subtask"):
         scheduler_dry_run(_envelope(), completed_subtasks={"missing"})
+
+
+def test_materialize_task_specs_preserves_tasks_links_and_is_immutable():
+    specs = materialize_task_specs(_envelope())
+
+    assert [task.id for task in specs.tasks] == ["build", "review"]
+    assert specs.tasks[0].role == "worker"
+    assert [(link.parent_id, link.child_id) for link in specs.links] == [
+        ("build", "review")
+    ]
+    with pytest.raises(AttributeError):
+        specs.tasks[0].id = "changed"
+
+
+def test_materialize_task_specs_is_byte_stable_for_repeated_conversion():
+    first = materialize_task_specs(_envelope())
+    second = materialize_task_specs(_envelope())
+
+    assert first == second
+    assert first.tasks[0].acceptance_json == '{"required":true}'
+    assert first.tasks[1].evidence_expectations_json == '["review_ref"]'
 
 
 def test_invalid_envelope_is_rejected_before_any_import_commit():
