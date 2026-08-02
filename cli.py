@@ -4406,6 +4406,47 @@ class HermesCLI(CLIAgentSetupMixin, CLICommandsMixin, CLIBillingMixin):
         )
         self._provider_source: Optional[str] = None
         self.provider = self.requested_provider
+        self._kanban_provider_selection = None
+        _kanban_policy_path = os.environ.get("HERMES_KANBAN_PROVIDER_POLICY")
+        if os.environ.get("HERMES_KANBAN_TASK") and not _kanban_policy_path:
+            raise RuntimeError(
+                "kanban provider policy runtime failed: provider policy artifact is missing"
+            )
+        if os.environ.get("HERMES_KANBAN_TASK") and _kanban_policy_path:
+            try:
+                _selection_json = os.environ.get("HERMES_KANBAN_PROVIDER_SELECTION_JSON")
+                if _selection_json:
+                    _selection = json.loads(_selection_json)
+                    if not isinstance(_selection, dict):
+                        raise ValueError("selection audit must be an object")
+                    if (_selection.get("requested_provider") != self.requested_provider or
+                            _selection.get("requested_model") != self.model):
+                        raise ValueError("selection audit does not match requested route")
+                else:
+                    from hermes_cli.kanban_provider_policy import select_runtime_provider
+
+                    _selection = select_runtime_provider(
+                        _kanban_policy_path,
+                        profile=os.environ.get("HERMES_PROFILE", ""),
+                        requested_provider=self.requested_provider,
+                        requested_model=self.model,
+                        available_models_json=os.environ.get("HERMES_KANBAN_AVAILABLE_MODELS_JSON"),
+                        credential_source_class=os.environ.get("HERMES_KANBAN_CREDENTIAL_SOURCE_CLASS", ""),
+                    )
+                    from dataclasses import asdict
+
+                    _selection = asdict(_selection)
+                self._kanban_provider_selection = _selection
+                self.requested_provider = str(_selection["effective_provider"])
+                self.provider = self.requested_provider
+                self.model = str(_selection["effective_model"])
+                _selection_audit_path = os.environ.get("HERMES_KANBAN_PROVIDER_SELECTION_AUDIT")
+                if _selection_audit_path:
+                    Path(_selection_audit_path).write_text(
+                        json.dumps(_selection, sort_keys=True) + "\n", encoding="utf-8"
+                    )
+            except (OSError, ValueError, TypeError, KeyError) as _error:
+                raise RuntimeError(f"kanban provider policy runtime failed: {_error}") from _error
         self.api_mode = "chat_completions"
         self.acp_command: Optional[str] = None
         self.acp_args: list[str] = []
