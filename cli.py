@@ -4408,6 +4408,10 @@ class HermesCLI(CLIAgentSetupMixin, CLICommandsMixin, CLIBillingMixin):
         self.provider = self.requested_provider
         self._kanban_provider_selection = None
         _kanban_policy_path = os.environ.get("HERMES_KANBAN_PROVIDER_POLICY")
+        if os.environ.get("HERMES_KANBAN_TASK") and not _kanban_policy_path:
+            raise RuntimeError(
+                "kanban provider policy runtime failed: provider policy artifact is missing"
+            )
         if os.environ.get("HERMES_KANBAN_TASK") and _kanban_policy_path:
             try:
                 _selection_json = os.environ.get("HERMES_KANBAN_PROVIDER_SELECTION_JSON")
