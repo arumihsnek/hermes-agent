@@ -264,6 +264,22 @@ def build_parser(parent_subparsers: argparse._SubParsersAction) -> argparse.Argu
     )
     p_plan.add_argument("--json", action="store_true", help="Emit the scheduler projection as JSON")
 
+    # --- durable planner import ---
+    p_import = sub.add_parser(
+        "import",
+        help="Durably import a planner-dag/v1 envelope without dispatching it",
+        description=(
+            "Import a validated planner-dag/v1 envelope into one explicitly "
+            "selected board. This command never creates a destination, "
+            "starts workers, or dispatches lifecycle work."
+        ),
+    )
+    p_import.add_argument("path", metavar="ENVELOPE", help="Path to a planner-dag/v1 JSON envelope")
+    p_import.add_argument("--import-id", required=True, help="Stable caller-owned import identity")
+    p_import.add_argument("--project", default=None, help="Existing project id or slug; never created implicitly")
+    p_import.add_argument("--created-by", default="planner-import", help="Audit author for the import record")
+    p_import.add_argument("--json", action="store_true", help="Emit the structured import result as JSON")
+
     # --- boards (new in v2: multi-project support) ---
     p_boards = sub.add_parser(
         "boards",
@@ -1005,6 +1021,12 @@ def kanban_command(args: argparse.Namespace) -> int:
     if action == "plan":
         return _cmd_plan(args)
 
+    # Durable import has a stricter destination contract than legacy commands:
+    # it must use an explicit board and must not initialize or touch the
+    # current-board fallback before that requirement is checked.
+    if action == "import":
+        return _cmd_import(args)
+
     # Board-management commands operate on board metadata and the persisted
     # current-board pointer itself. They must ignore the shared `--board`
     # task-routing override; otherwise `/kanban --board beta boards show`
@@ -1143,6 +1165,60 @@ def _cmd_plan(args: argparse.Namespace) -> int:
         for key in ("ready_workers", "ready_reviewers", "ready_closers", "blocked", "not_yet_runnable", "batch_candidates", "policy_violations"):
             print(f"{key}: {json.dumps(projection[key], sort_keys=True)}")
     return 0
+
+
+def _cmd_import(args: argparse.Namespace) -> int:
+    """Durably import a planner envelope without activating lifecycle work."""
+    board = getattr(args, "board", None)
+    if not board:
+        print("planner: durable import requires explicit --board", file=sys.stderr)
+        return 2
+    try:
+        board = kb._normalize_board_slug(board)
+    except ValueError as exc:
+        print(f"planner: invalid board: {exc}", file=sys.stderr)
+        return 2
+    if not board:
+        print("planner: durable import requires explicit --board", file=sys.stderr)
+        return 2
+    if board != kb.DEFAULT_BOARD and not kb.board_exists(board):
+        print(
+            f"planner: board {board!r} does not exist; create it explicitly first",
+            file=sys.stderr,
+        )
+        return 1
+    path = Path(args.path)
+    if path.is_symlink() or not path.is_file():
+        print(f"planner: envelope must be a regular file: {path}", file=sys.stderr)
+        return 2
+    try:
+        envelope = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        print(f"planner: cannot read envelope: {exc}", file=sys.stderr)
+        return 2
+    try:
+        from hermes_cli.kanban_planner_import import import_planner_envelope
+
+        kb.init_db(board=board)
+        with kb.connect_closing(board=board) as conn:
+            result = import_planner_envelope(
+                conn,
+                envelope,
+                import_id=args.import_id,
+                board=board,
+                project_id=getattr(args, "project", None),
+                created_by=getattr(args, "created_by", "planner-import"),
+            )
+    except (OSError, ValueError, RuntimeError) as exc:
+        print(f"planner: durable import failed: {exc}", file=sys.stderr)
+        return 1
+    if getattr(args, "json", False):
+        print(json.dumps(result.to_dict(), sort_keys=True, ensure_ascii=False))
+    else:
+        print(f"planner import: {result.status} ({result.import_id})")
+        if result.error_code:
+            print(f"planner error: {result.error_code}", file=sys.stderr)
+    return 0 if result.status in {"created", "already-imported"} else 1
 
 def _profile_author() -> str:
     """Best-effort author name for an interactive CLI call."""
