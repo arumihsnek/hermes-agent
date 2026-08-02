@@ -325,37 +325,42 @@ def activate_planner_import(
         )
 
     promoted: list[str] = []
-    with kb.write_txn(conn):
-        mappings = conn.execute(
-            "SELECT planner_task_id, task_id FROM kanban_planner_task_map "
-            "WHERE board = ? AND import_id = ? ORDER BY planner_task_id",
-            (normalized_board, normalized_import_id),
-        ).fetchall()
-        for mapping in mappings:
-            task_id = mapping["task_id"]
-            task = conn.execute("SELECT status FROM tasks WHERE id = ?", (task_id,)).fetchone()
-            if task is None or task["status"] != "todo":
-                continue
-            parents = conn.execute(
-                "SELECT parent.status FROM task_links link "
-                "JOIN tasks parent ON parent.id = link.parent_id "
-                "WHERE link.child_id = ? ORDER BY link.parent_id",
-                (task_id,),
+    try:
+        with kb.write_txn(conn):
+            mappings = conn.execute(
+                "SELECT planner_task_id, task_id FROM kanban_planner_task_map "
+                "WHERE board = ? AND import_id = ? ORDER BY planner_task_id",
+                (normalized_board, normalized_import_id),
             ).fetchall()
-            if not all(parent["status"] in {"done", "archived"} for parent in parents):
-                continue
-            changed = conn.execute(
-                "UPDATE tasks SET status = 'ready' WHERE id = ? AND status = 'todo'",
-                (task_id,),
-            ).rowcount
-            if changed:
-                kb._append_event(
-                    conn,
-                    task_id,
-                    "promoted",
-                    {"source": "planner-activate", "import_id": normalized_import_id},
-                )
-                promoted.append(task_id)
+            for mapping in mappings:
+                task_id = mapping["task_id"]
+                task = conn.execute("SELECT status FROM tasks WHERE id = ?", (task_id,)).fetchone()
+                if task is None or task["status"] != "todo":
+                    continue
+                parents = conn.execute(
+                    "SELECT parent.status FROM task_links link "
+                    "JOIN tasks parent ON parent.id = link.parent_id "
+                    "WHERE link.child_id = ? ORDER BY link.parent_id",
+                    (task_id,),
+                ).fetchall()
+                if not all(parent["status"] in {"done", "archived"} for parent in parents):
+                    continue
+                changed = conn.execute(
+                    "UPDATE tasks SET status = 'ready' WHERE id = ? AND status = 'todo'",
+                    (task_id,),
+                ).rowcount
+                if changed:
+                    kb._append_event(
+                        conn,
+                        task_id,
+                        "promoted",
+                        {"source": "planner-activate", "import_id": normalized_import_id},
+                    )
+                    promoted.append(task_id)
+    except Exception:
+        return PlannerActivationResult(
+            "failed", normalized_import_id, normalized_board, error_code="ACTIVATION_DB_FAILURE"
+        )
     return PlannerActivationResult(
         "activated" if promoted else "already-active",
         normalized_import_id,
