@@ -1243,6 +1243,37 @@ CREATE TABLE IF NOT EXISTS task_links (
     PRIMARY KEY (parent_id, child_id)
 );
 
+-- Durable planner import identity and planner-id mapping. These tables are
+-- board-local because each board has its own Kanban database. Planner IDs are
+-- not task IDs: Hermes task IDs remain internally generated and the mapping
+-- makes retries and cross-import scopes explicit.
+CREATE TABLE IF NOT EXISTS kanban_planner_imports (
+    board                TEXT NOT NULL,
+    import_id            TEXT NOT NULL,
+    schema_version       TEXT NOT NULL,
+    fingerprint_algorithm TEXT NOT NULL,
+    fingerprint          TEXT NOT NULL,
+    project_id           TEXT,
+    status               TEXT NOT NULL CHECK(status = 'committed'),
+    task_count           INTEGER NOT NULL,
+    anchor_task_id       TEXT NOT NULL,
+    created_at           INTEGER NOT NULL,
+    PRIMARY KEY (board, import_id),
+    UNIQUE (board, import_id, fingerprint_algorithm, fingerprint)
+);
+
+CREATE TABLE IF NOT EXISTS kanban_planner_task_map (
+    board           TEXT NOT NULL,
+    import_id       TEXT NOT NULL,
+    planner_task_id TEXT NOT NULL,
+    task_id         TEXT NOT NULL,
+    PRIMARY KEY (board, import_id, planner_task_id),
+    UNIQUE (board, import_id, task_id),
+    FOREIGN KEY (board, import_id)
+        REFERENCES kanban_planner_imports(board, import_id),
+    FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE RESTRICT
+);
+
 CREATE TABLE IF NOT EXISTS task_comments (
     id         INTEGER PRIMARY KEY AUTOINCREMENT,
     task_id    TEXT NOT NULL,
@@ -1328,6 +1359,7 @@ CREATE INDEX IF NOT EXISTS idx_tasks_assignee_status ON tasks(assignee, status);
 CREATE INDEX IF NOT EXISTS idx_tasks_status          ON tasks(status);
 CREATE INDEX IF NOT EXISTS idx_links_child           ON task_links(child_id);
 CREATE INDEX IF NOT EXISTS idx_links_parent          ON task_links(parent_id);
+CREATE INDEX IF NOT EXISTS idx_planner_map_task      ON kanban_planner_task_map(task_id);
 CREATE INDEX IF NOT EXISTS idx_comments_task         ON task_comments(task_id, created_at);
 CREATE INDEX IF NOT EXISTS idx_events_task           ON task_events(task_id, created_at);
 CREATE INDEX IF NOT EXISTS idx_runs_task             ON task_runs(task_id, started_at);
