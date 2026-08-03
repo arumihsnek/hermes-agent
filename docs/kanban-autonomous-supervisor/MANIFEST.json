@@ -1,0 +1,169 @@
+{
+  "document_type": "kanban_autonomous_supervisor_manifest",
+  "schema_version": "1.0.0",
+  "generated_at": "2026-08-03T23:03:00+02:00",
+  "repository": "arumihsnek/hermes-agent",
+  "official_upstream_reference": "NousResearch/hermes-agent",
+  "default_branch": "main",
+  "published_head": "734529568fa094ceabbe95aaf0bbc8c0e7e1abad",
+  "mission_id": "kanban-autonomous-supervisor",
+  "mission_complete": false,
+  "current_phase": "operational_acceptance",
+  "active_delivery": {
+    "type": "post_merge_acceptance",
+    "r7_pr": 20,
+    "r7_feature_sha": "1d20e08490c3e7b6def43a9e57b0e3cd47c127a4",
+    "r7_merge_sha": "734529568fa094ceabbe95aaf0bbc8c0e7e1abad",
+    "state": "implementation_merged_operational_acceptance_pending"
+  },
+  "phases": [
+    {
+      "id": "R0",
+      "name": "investigation",
+      "status": "completed",
+      "repository": "control-plane"
+    },
+    {
+      "id": "R1",
+      "name": "mission-state contract",
+      "status": "completed",
+      "repository": "control-plane"
+    },
+    {
+      "id": "R2",
+      "name": "durable mission state",
+      "status": "merged",
+      "pr": 15,
+      "merge_sha": "6a31a89b0668d255e7e110d3e029da92a4c794db",
+      "focused_tests": 138
+    },
+    {
+      "id": "R3",
+      "name": "durable supervisor",
+      "status": "merged",
+      "pr": 16,
+      "feature_sha": "83afe98aee3d6f78e8b96abdaf02fb56997ee019",
+      "merge_sha": "eaf307a9fe489ebe7f5b9a38781c7aef010b8002",
+      "focused_tests": 55
+    },
+    {
+      "id": "R4",
+      "name": "human decision core",
+      "status": "merged",
+      "pr": 17,
+      "feature_sha": "f7177f2ec919d55773fc809aead523b006adeb29",
+      "merge_sha": "d12aca851c67dc1c1056beec9cb39d0af08e442c",
+      "focused_tests": 33
+    },
+    {
+      "id": "R5",
+      "name": "roadmap executor",
+      "status": "merged",
+      "pr": 18,
+      "feature_sha": "047c7bb9046e715f00a6ccd3f4f0e587780958b7",
+      "merge_sha": "d5d7d99d987b639613a0cc93069d3079442ad758",
+      "focused_tests": 18
+    },
+    {
+      "id": "R6",
+      "name": "component end-to-end canary",
+      "status": "merged",
+      "pr": 19,
+      "feature_sha": "cde68ad75fe6bf200de306fb5f60092faee2ba55",
+      "merge_sha": "337d698e1affa5a0195da641a74e8a1fa42ac3a8",
+      "focused_tests": 7
+    },
+    {
+      "id": "R7",
+      "name": "adoption hardening",
+      "status": "merged",
+      "pr": 20,
+      "feature_sha": "1d20e08490c3e7b6def43a9e57b0e3cd47c127a4",
+      "merge_sha": "734529568fa094ceabbe95aaf0bbc8c0e7e1abad",
+      "focused_tests_reported": 18
+    }
+  ],
+  "components": [
+    {
+      "path": "hermes_cli/kanban_mission_state.py",
+      "phase": "R2",
+      "status": "merged"
+    },
+    {
+      "path": "hermes_cli/kanban_supervisor.py",
+      "phase": "R3",
+      "status": "merged",
+      "r7_changes": "merged"
+    },
+    {
+      "path": "hermes_cli/kanban_human_gate.py",
+      "phase": "R4",
+      "status": "merged"
+    },
+    {
+      "path": "hermes_cli/kanban_roadmap_executor.py",
+      "phase": "R5",
+      "status": "merged"
+    },
+    {
+      "path": "tests/hermes_cli/test_kanban_e2e_canary.py",
+      "phase": "R6",
+      "status": "merged"
+    },
+    {
+      "path": "tests/hermes_cli/test_kanban_hardening.py",
+      "phase": "R7",
+      "status": "merged"
+    }
+  ],
+  "tables": [
+    "mission_missions",
+    "mission_journal",
+    "mission_supervisor_leases",
+    "mission_roadmap_slices",
+    "mission_supervisor_state",
+    "mission_human_decisions"
+  ],
+  "canonical_documents": [
+    "docs/kanban-autonomous-supervisor/README.md",
+    "docs/kanban-autonomous-supervisor/STATUS.md",
+    "docs/kanban-autonomous-supervisor/SPEC.md",
+    "docs/kanban-autonomous-supervisor/ROADMAP.md",
+    "docs/kanban-autonomous-supervisor/CHECKPOINTS.md",
+    "docs/kanban-autonomous-supervisor/EVIDENCE.md",
+    "docs/kanban-autonomous-supervisor/CHANGELOG.md",
+    "docs/kanban-autonomous-supervisor/MANIFEST.json"
+  ],
+  "historical_documents": [
+    {
+      "path": "docs/plans/r3-roadmap-bundle.json",
+      "role": "R3 architecture consultation input",
+      "live_status": false
+    },
+    {
+      "path": "docs/plans/kanban-autonomous-supervisor-roadmap.md",
+      "role": "public phase roadmap mirror",
+      "live_status": true
+    }
+  ],
+  "known_acceptance_gaps": [
+    "real Hermes chat transport for human gates",
+    "real codex-senior-consult call in integrated mission",
+    "distinct-process or distinct-session resume demonstration",
+    "self-hosted roadmap execution",
+    "operational mission start/status/resume/stop interface",
+    "controlled live non-destructive adoption",
+    "supervisor-driven exact-head review and personal PR lifecycle"
+  ],
+  "source_of_truth_order": [
+    "exact code and migrations at published head",
+    "durable SQLite mission state",
+    "Git commits and merged PR metadata",
+    "MANIFEST.json",
+    "STATUS.md",
+    "SPEC.md",
+    "ROADMAP.md",
+    "historical reports"
+  ],
+  "next_safe_action": "Audit merged R7 runtime enforcement, then execute real chat, process-handoff, self-hosting, and controlled live-adoption canaries."
+}
