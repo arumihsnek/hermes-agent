@@ -1,0 +1,162 @@
+{
+  "alternatives": [
+    {
+      "option": "A: Roadmap slices as K9 cards",
+      "impact": "Tight coupling to K9 planner import; slices would require a board and import_id even for infrastructure work. Rejected because R3 slices are roadmap-defined, not Kanban-card-defined."
+    },
+    {
+      "option": "B: File-based leases (lockfiles)",
+      "impact": "Race conditions on NFS; no atomic check-and-set; harder to debug. SQLite lease is atomic within BEGIN IMMEDIATE and consistent with existing K9 pattern."
+    },
+    {
+      "option": "C: Supervisor state embedded in mission_missions.state_json",
+      "impact": "Would bloat the R1 schema with supervisor-specific fields. Separate table keeps concerns clean and allows independent evolution."
+    }
+  ],
+  "caller_required": [
+    "/alternatives",
+    "/candidate_decision",
+    "/code_excerpts",
+    "/constraints",
+    "/current_plan",
+    "/decision_needed",
+    "/diff",
+    "/escalation",
+    "/invalidated_assumptions",
+    "/objective",
+    "/observed_facts",
+    "/progress",
+    "/questions",
+    "/relevant_contracts",
+    "/risks_already_identified",
+    "/runtime_evidence",
+    "/snapshot/checkpoint_fingerprint",
+    "/snapshot/plan_fingerprint",
+    "/tests"
+  ],
+  "candidate_decision": {
+    "accept_roadmap": true,
+    "key_architectural_choices": [
+      "Slices are roadmap-defined objects (not K9 cards)",
+      "Lease via SQLite table with TTL (not external mutex)",
+      "Supervisor state in separate table (not embedded in mission_state)",
+      "Roadmap format is YAML (not JSON)",
+      "One supervisor per mission enforced by lease"
+    ]
+  },
+  "code_excerpts": [
+    {
+      "file": "hermes_cli/kanban_mission_state.py",
+      "excerpt": "def compare_and_transition(conn, *, mission_id, expected_generation, operation_id, next_state, consumes_consultation=None, decision_id=None) -> TransitionResult",
+      "line_range": "835-1039"
+    }
+  ],
+  "constraints": [
+    "R2 mission-state module (kanban_mission_state.py) is FROZEN — no modifications",
+    "R1 schema v1 is frozen — no breaking changes",
+    "No changes to live Hermes gateway, sessions, or configuration",
+    "No network calls in supervisor core — delegation via callback only",
+    "SQLite same-DB pattern with lazy import for circular dependency avoidance",
+    "All new tables via CREATE TABLE IF NOT EXISTS — idempotent migration",
+    "No new external Python dependencies",
+    "Fast-forward merges only in personal repo (arumihsnek/hermes-agent)",
+    "No writes to upstream NousResearch/hermes-agent"
+  ],
+  "current_plan": {
+    "R3": "Durable Supervisor Minimum — supervisor loop, lease management, slice execution, crash recovery, outcome classification. New tables: mission_supervisor_leases, mission_roadmap_slices, mission_supervisor_state.",
+    "R4": "Durable Human Decision Channel — transport-agnostic gate lifecycle, question persistence, response validation, staleness detection.",
+    "R5": "Autonomous Roadmap Executor — YAML roadmap loader, DAG dependency resolver, senior consult integration, PR lifecycle, replan logic.",
+    "R6": "End-to-End Canary — synthetic test roadmap exercising all states and transitions. 22-step lifecycle demonstration.",
+    "R7": "Adoption and Hardening — documentation, loop protection, per-slice budget, backoff, fresh install test, upgrade test, real mission test."
+  },
+  "decision_needed": "Is the R3-R7 roadmap architecturally sound? Are there material gaps, missing phases, incorrect assumptions, or risks that should be addressed before R3 implementation begins?",
+  "diff": {
+    "summary": "New roadmap document (19KB) defining R3-R7 phases for autonomous supervisor system. No code changes yet.",
+    "sha256": "cf1f0d72dbc313ac754a9ea893d9ffe7f53e638ca073b4ad606a161c631a8853"
+  },
+  "escalation": {
+    "local_deterministic_checks": [
+      "R2 API (create_mission, get_mission, compare_and_transition) is tested and working",
+      "Migration pattern (lazy import in kanban_db.connect) is proven",
+      "codex-senior-consult integration exists and works",
+      "No circular imports exist in current module structure"
+    ],
+    "material_impact": "The roadmap defines the architecture for Hermes' long-running mission capability. Incorrect phase structure or missing components would require re-planning mid-execution, increasing cost and risk."
+  },
+  "invalidated_assumptions": [],
+  "mission_id": "kanban-autonomous-supervisor",
+  "mode": "plan-review",
+  "objective": "Review the kanban-autonomous-supervisor roadmap (R3-R7) for architectural soundness, completeness, and feasibility. The roadmap builds a durable supervisor loop (R3), human decision channel (R4), autonomous roadmap executor (R5), end-to-end canary (R6), and adoption hardening (R7) on top of the existing R2 mission-state persistence layer.",
+  "observed_facts": [
+    "R2 HEAD: 6a31a89b0668d255e7e110d3e029da92a4c794db",
+    "R2 tree: ea04b376218a8d5d5a1ab3de3eefab6fe3e9cb3f",
+    "R2 tables: mission_missions, mission_journal",
+    "R2 API: create_mission, get_mission, compare_and_transition, list_journal",
+    "R2 tests: 2143 LOC, 138 focused tests, all pass",
+    "R2 migration: integrated into kanban_db.connect() via lazy import",
+    "Senior consult: codex-senior-consult available at /home/ubuntu/.local/bin/",
+    "Python: 3.12.3, uv available, pytest via uv run"
+  ],
+  "progress": {
+    "completed": [
+      "R0: Entity ownership matrix, design A/B comparison",
+      "R1: Schema v1 frozen, fixtures, tests (18 tests)",
+      "R2: Durable backend (1054 LOC), 138/138 focused tests, PR #15 merged"
+    ],
+    "current": "Roadmap review before R3 implementation"
+  },
+  "questions": [
+    {
+      "id": "Q1",
+      "text": "Is the 5-phase structure (R3-R7) correct, or are phases missing/combined wrong?"
+    },
+    {
+      "id": "Q2",
+      "text": "Should the supervisor use a separate SQLite table for state or embed in mission_missions.state_json?"
+    },
+    {
+      "id": "Q3",
+      "text": "Is the lease mechanism (SQLite table + TTL + atomic acquire) sufficient for single-supervisor enforcement?"
+    },
+    {
+      "id": "Q4",
+      "text": "Are there material risks in the R3 write set or non-write set that could cause integration issues?"
+    }
+  ],
+  "relevant_contracts": [
+    "kanban-mission-state/v1 (R1 schema — frozen)",
+    "hermes_cli/kanban_mission_state.py (R2 API — frozen)",
+    "codex-senior-consult/v3 (consultation protocol)",
+    "AGENTS.md contribution rubric and Footprint Ladder"
+  ],
+  "repository": {
+    "dirty": false,
+    "identity_fingerprint": "de38d50a9baa132db4c231766520f225ea370a37412603c9fe48a32ea5e6996b",
+    "name": "kanban-autonomous-supervisor-r3"
+  },
+  "requested_output": {
+    "schema_version": "codex-senior-consult-response/v3"
+  },
+  "risks_already_identified": [
+    "SQLite WAL contention under concurrent supervisors (mitigated: BEGIN IMMEDIATE)",
+    "Lease TTL too short for long-running slices (mitigated: renewable lease)",
+    "Senior consult timeout during gate (mitigated: retry with replacement)",
+    "Roadmap format rigidity (mitigated: YAML with extension points)"
+  ],
+  "runtime_evidence": [
+    "R2 focused suite: 138/138 passed (from session report)",
+    "test_secret_scope.py: 25/25 passed",
+    "kanban_db.py: py_compile PASS",
+    "test_secret_scope.py: py_compile PASS"
+  ],
+  "schema_version": "codex-senior-consult/v1",
+  "snapshot": {
+    "repository_head": "6a31a89b0668d255e7e110d3e029da92a4c794db",
+    "working_tree_fingerprint": "e253b9c36347424804ee85ea3b3ad459795fb166570b3e83e9ac969eb765c6d0",
+    "plan_fingerprint": "cf1f0d72dbc313ac754a9ea893d9ffe7f53e638ca073b4ad606a161c631a8853",
+    "checkpoint_fingerprint": "50d8fb73431701a1c74ed7103ec10e93a123fd06da352bccd866f8375d054335"
+  },
+  "tests": [
+    "tests/hermes_cli/test_kanban_mission_state.py (2143 LOC — R2 tests, all pass)"
+  ]
+}
