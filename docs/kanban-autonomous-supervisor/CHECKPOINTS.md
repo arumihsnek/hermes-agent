@@ -6,9 +6,10 @@ use SQLite as their runtime source of truth.
 ## Current checkpoint
 
 ```text
-checkpoint_id=kanban-autonomous-supervisor-20260803-2303
+checkpoint_id=kanban-autonomous-supervisor-20260803-2315
 repository=arumihsnek/hermes-agent
-published_main=734529568fa094ceabbe95aaf0bbc8c0e7e1abad
+repository_main=163b8dd488b77d4cf0ba19ab04d47e42a9c03bac
+runtime_head=734529568fa094ceabbe95aaf0bbc8c0e7e1abad
 implementation_completed_through=R7
 active_phase=operational_acceptance
 r7_pr=20
@@ -119,7 +120,7 @@ focused_tests_reported=18
 ## Resume checklist for a new session
 
 1. Read `README.md`, `STATUS.md`, `SPEC.md`, and `ROADMAP.md` in this directory.
-2. Read `MANIFEST.json` and verify `published_head` against `personal-product/main`.
+2. Read `MANIFEST.json` and verify `repository_head` against `personal-product/main`.
 3. Verify R7 merge `734529568fa094ceabbe95aaf0bbc8c0e7e1abad` is still an ancestor of personal `main`.
 4. Reconcile any later operational-adoption commits into this ledger.
 5. Preserve the distinction between implementation tests and operational proof.

@@ -2,7 +2,8 @@
 
 > Canonical current roadmap  
 > Updated: 2026-08-03  
-> Published main at update: `734529568fa094ceabbe95aaf0bbc8c0e7e1abad`
+> Repository main at update: `163b8dd488b77d4cf0ba19ab04d47e42a9c03bac`  
+> Runtime implementation head: `734529568fa094ceabbe95aaf0bbc8c0e7e1abad`
 
 ## North-star outcome
 

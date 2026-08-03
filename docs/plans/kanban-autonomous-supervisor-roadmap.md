@@ -1,8 +1,9 @@
 # Kanban Autonomous Supervisor Roadmap
 
 > Mission: `kanban-autonomous-supervisor`  
-> Updated: `2026-08-03T23:03:00+02:00`  
-> Published main: `734529568fa094ceabbe95aaf0bbc8c0e7e1abad`  
+> Updated: `2026-08-03T23:15:00+02:00`  
+> Repository main: `163b8dd488b77d4cf0ba19ab04d47e42a9c03bac`  
+> Runtime implementation head: `734529568fa094ceabbe95aaf0bbc8c0e7e1abad`  
 > Current phase: operational acceptance  
 > Implementation phases R2–R7 merged: **yes**  
 > Mission complete: **no**

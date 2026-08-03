@@ -3,8 +3,9 @@
 > Canonical documentation set for the long-running Kanban mission supervisor in
 > `arumihsnek/hermes-agent`.
 >
-> Snapshot time: `2026-08-03T22:57:00+02:00`  
-> Published `main`: `734529568fa094ceabbe95aaf0bbc8c0e7e1abad`  
+> Snapshot time: `2026-08-03T23:15:00+02:00`  
+> Repository `main`: `163b8dd488b77d4cf0ba19ab04d47e42a9c03bac`  
+> Runtime implementation head: `734529568fa094ceabbe95aaf0bbc8c0e7e1abad`  
 > Latest delivery: R7 merged by PR #20 at `734529568fa094ceabbe95aaf0bbc8c0e7e1abad`
 
 ## Read this first
