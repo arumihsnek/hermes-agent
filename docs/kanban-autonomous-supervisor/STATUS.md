@@ -2,9 +2,9 @@
 
 > Status snapshot: `2026-08-03T22:57:00+02:00`  
 > Repository: `arumihsnek/hermes-agent`  
-> Published `main`: `337d698e1affa5a0195da641a74e8a1fa42ac3a8`  
-> Active PR: `#20 feat: R7 adoption hardening`  
-> Active PR head: `1d20e08490c3e7b6def43a9e57b0e3cd47c127a4`
+> Published `main`: `734529568fa094ceabbe95aaf0bbc8c0e7e1abad`  
+> Latest merged PR: `#20 feat: R7 adoption hardening`  
+> R7 merge: `734529568fa094ceabbe95aaf0bbc8c0e7e1abad`
 
 ## Objective
 
@@ -25,11 +25,10 @@ coordinating every phase.
 | R4 | Durable human-decision core | Merged | PR #17, merge `d12aca85...` |
 | R5 | Autonomous roadmap executor | Merged | PR #18, merge `d5d7d99d...` |
 | R6 | Integrated component canary | Merged | PR #19, merge `337d698e...` |
-| R7 | Adoption hardening | **Open, not merged** | PR #20, head `1d20e084...` |
+| R7 | Adoption hardening | Merged | PR #20, merge `73452956...` |
 
-Implementation progress for the R3–R7 roadmap is therefore **4 merged phases out of 5**,
-with the fifth implemented in an open PR. Mission acceptance remains incomplete until the
-real-world gates below are demonstrated.
+Implementation progress for the R3–R7 roadmap is now **5 merged phases out of 5**.
+Mission acceptance nevertheless remains incomplete until the real-world gates below are demonstrated.
 
 ## What exists on published `main`
 
@@ -76,7 +75,7 @@ real-world gates below are demonstrated.
   queue exhaustion, and final consistency.
 - It is a **component-level canary**, not proof of live autonomous operation.
 
-## R7 currently proposed in PR #20
+## R7 merged through PR #20
 
 - Correction and identical-failure limits.
 - Exponential backoff with a maximum cap.
@@ -86,7 +85,7 @@ real-world gates below are demonstrated.
 - Non-destructive mission test.
 - Additive rollback-safety tests.
 
-R7 is not part of `main` until PR #20 is reviewed and merged.
+R7 is part of `main` at merge commit `734529568fa094ceabbe95aaf0bbc8c0e7e1abad`.
 
 ## What is still unproven
 
@@ -109,7 +108,7 @@ These are acceptance gaps, not optional polish:
 
 ### As a library
 
-Advanced and usable for isolated orchestration experiments. R2–R6 are merged and tested.
+Advanced and usable for isolated orchestration experiments. R2–R7 are merged and tested.
 
 ### As an autonomous product feature
 
@@ -123,9 +122,9 @@ active even after R3–R6 had merged; that stale status is corrected by this upd
 
 ## Immediate next actions
 
-1. Review PR #20 against the full R7 acceptance criteria, not only its 18 focused tests.
-2. Merge R7 only if no P0/P1 findings remain.
-3. Implement or validate a real Hermes conversation transport for human gates.
-4. Run a true two-session/process recovery canary.
-5. Run a self-hosting canary where the roadmap executor advances the remaining roadmap.
-6. Perform controlled live adoption with rollback and observability.
+1. Audit whether R7 loop limits, fingerprints, and backoff are enforced by runtime control flow rather than only exposed as helpers.
+2. Implement or validate a real Hermes conversation transport for human gates.
+3. Run a true two-session/process recovery canary.
+4. Run a self-hosting canary where the roadmap executor advances a real roadmap.
+5. Perform controlled live adoption with rollback and observability.
+6. Record the exact accepted operational head in a final checkpoint.
