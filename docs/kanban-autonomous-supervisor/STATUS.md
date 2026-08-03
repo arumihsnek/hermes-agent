@@ -1,11 +1,15 @@
 # Current Project Status
 
-> Status snapshot: `2026-08-03T23:15:00+02:00`  
+> Status snapshot: `2026-08-03T23:28:00+02:00`  
 > Repository: `arumihsnek/hermes-agent`  
-> Repository `main`: `163b8dd488b77d4cf0ba19ab04d47e42a9c03bac`  
+> Verification target: merged `personal-product/main`  
+> Repository `main` observed before this documentation update: `ed5622aa3926805167ceea42c70c21fde1def73c`  
 > Runtime implementation head: `734529568fa094ceabbe95aaf0bbc8c0e7e1abad`  
-> Latest merged PR: `#20 feat: R7 adoption hardening`  
-> R7 merge: `734529568fa094ceabbe95aaf0bbc8c0e7e1abad`
+> Latest runtime PR: `#20 feat: R7 adoption hardening`
+
+The repository-head field is an observation, not a self-updating invariant. Documentation
+merges advance `main`; the stable runtime identity for R2–R7 is the runtime implementation
+head above.
 
 ## Objective
 
@@ -15,21 +19,47 @@ gates, ask the user only for irreducible human decisions, resume after the answe
 finish through review and personal-repository integration without an external supervisor
 coordinating every phase.
 
+## Latest verification
+
+Fresh verification on merged `personal-product/main` reports:
+
+```text
+239 passed
+0 failed
+RC=0
+```
+
+Non-overlapping phase breakdown:
+
+| Phase | Suite | Passed |
+|---|---|---:|
+| R2 | mission-state | 108 |
+| R3 | supervisor | 55 |
+| R4 | human gate | 33 |
+| R5 | roadmap executor | 18 |
+| R6 | canary | 7 |
+| R7 | hardening | 18 |
+| **Total** | **R2–R7 focused aggregate** | **239** |
+
+This is now the canonical aggregate count. The former R2 total of 138 included 30
+additional Kanban DB tests and therefore must not be added to the R3–R7 subtotals.
+
 ## Phase status
 
 | Phase | Purpose | Delivery status | Evidence |
 |---|---|---:|---|
 | R0 | Investigate ownership and continuation gap | Complete, historical | control-plane reports |
 | R1 | Freeze `kanban-mission-state/v1` contract | Complete, historical | control-plane schema and fixtures |
-| R2 | Durable mission-state backend | Merged | PR #15, merge `6a31a89b...` |
-| R3 | Reentrant durable supervisor | Merged | PR #16, merge `eaf307a9...` |
-| R4 | Durable human-decision core | Merged | PR #17, merge `d12aca85...` |
-| R5 | Autonomous roadmap executor | Merged | PR #18, merge `d5d7d99d...` |
-| R6 | Integrated component canary | Merged | PR #19, merge `337d698e...` |
-| R7 | Adoption hardening | Merged | PR #20, merge `73452956...` |
+| R2 | Durable mission-state backend | Merged | PR #15, merge `6a31a89b...`, 108 focused |
+| R3 | Reentrant durable supervisor | Merged | PR #16, merge `eaf307a9...`, 55 focused |
+| R4 | Durable human-decision core | Merged | PR #17, merge `d12aca85...`, 33 focused |
+| R5 | Autonomous roadmap executor | Merged | PR #18, merge `d5d7d99d...`, 18 focused |
+| R6 | Integrated component canary | Merged | PR #19, merge `337d698e...`, 7 focused |
+| R7 | Adoption hardening | Merged | PR #20, merge `73452956...`, 18 focused |
 
-Implementation progress for the R3–R7 roadmap is now **5 merged phases out of 5**.
-Mission acceptance nevertheless remains incomplete until the real-world gates below are demonstrated.
+Implementation progress for the R3–R7 roadmap is **5 merged phases out of 5**. The
+combined R2–R7 focused aggregate is **239/239, RC=0**. Mission acceptance nevertheless
+remains incomplete until the real-world gates below are demonstrated.
 
 ## What exists on published `main`
 
@@ -76,7 +106,7 @@ Mission acceptance nevertheless remains incomplete until the real-world gates be
   queue exhaustion, and final consistency.
 - It is a **component-level canary**, not proof of live autonomous operation.
 
-## R7 merged through PR #20
+### Adoption hardening — R7
 
 - Correction and identical-failure limits.
 - Exponential backoff with a maximum cap.
@@ -86,7 +116,8 @@ Mission acceptance nevertheless remains incomplete until the real-world gates be
 - Non-destructive mission test.
 - Additive rollback-safety tests.
 
-R7 is part of the runtime implementation at merge commit `734529568fa094ceabbe95aaf0bbc8c0e7e1abad`.
+R7 is part of the runtime implementation at merge commit
+`734529568fa094ceabbe95aaf0bbc8c0e7e1abad`.
 
 ## What is still unproven
 
@@ -109,7 +140,8 @@ These are acceptance gaps, not optional polish:
 
 ### As a library
 
-Advanced and usable for isolated orchestration experiments. R2–R7 are merged and tested.
+Advanced and internally consistent for isolated orchestration experiments. R2–R7 are
+merged and the combined focused scope passes 239/239 with RC=0.
 
 ### As an autonomous product feature
 
@@ -118,8 +150,8 @@ self-hosting, and live operational integration are not demonstrated.
 
 ### As a documentation system
 
-This directory is the canonical status set. The older roadmap previously reported R3 as
-active even after R3–R6 had merged; that stale status is corrected by this update.
+This directory is the canonical status set. Historical aggregate-count discrepancies are
+resolved by `EVIDENCE.md`, which records the exact non-overlapping 239-test breakdown.
 
 ## Immediate next actions
 

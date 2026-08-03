@@ -1,17 +1,40 @@
 {
   "document_type": "kanban_autonomous_supervisor_manifest",
-  "schema_version": "1.0.0",
-  "generated_at": "2026-08-03T23:15:00+02:00",
+  "schema_version": "1.1.0",
+  "generated_at": "2026-08-03T23:28:00+02:00",
   "repository": "arumihsnek/hermes-agent",
   "official_upstream_reference": "NousResearch/hermes-agent",
   "default_branch": "main",
   "mission_id": "kanban-autonomous-supervisor",
   "mission_complete": false,
   "current_phase": "operational_acceptance",
-  "repository_head": "163b8dd488b77d4cf0ba19ab04d47e42a9c03bac",
+  "repository_head_observed_before_verification_update": "ed5622aa3926805167ceea42c70c21fde1def73c",
   "runtime_implementation_head": "734529568fa094ceabbe95aaf0bbc8c0e7e1abad",
-  "documentation_merge_pr": 21,
-  "documentation_merge_sha": "163b8dd488b77d4cf0ba19ab04d47e42a9c03bac",
+  "documentation_merge_prs": [21, 22],
+  "current_checkpoint": "docs/kanban-autonomous-supervisor/CHECKPOINTS-CURRENT.md",
+  "verification": {
+    "verified_at": "2026-08-03T23:28:00+02:00",
+    "target": "personal-product/main",
+    "runtime_head": "734529568fa094ceabbe95aaf0bbc8c0e7e1abad",
+    "aggregate": {
+      "collected": 239,
+      "passed": 239,
+      "failed": 0,
+      "exit_code": 0
+    },
+    "phase_breakdown": {
+      "R2_mission_state": 108,
+      "R3_supervisor": 55,
+      "R4_human_gate": 33,
+      "R5_roadmap_executor": 18,
+      "R6_canary": 7,
+      "R7_hardening": 18
+    },
+    "breakdown_sum": 239,
+    "raw_command_committed": false,
+    "raw_log_committed": false,
+    "evidence_source": "fresh operator verification report"
+  },
   "active_delivery": {
     "type": "post_merge_acceptance",
     "r7_pr": 20,
@@ -38,7 +61,8 @@
       "status": "merged",
       "pr": 15,
       "merge_sha": "6a31a89b0668d255e7e110d3e029da92a4c794db",
-      "focused_tests": 138
+      "focused_tests": 108,
+      "additional_kanban_db_tests_historically_reported": 30
     },
     {
       "id": "R3",
@@ -83,7 +107,7 @@
       "pr": 20,
       "feature_sha": "1d20e08490c3e7b6def43a9e57b0e3cd47c127a4",
       "merge_sha": "734529568fa094ceabbe95aaf0bbc8c0e7e1abad",
-      "focused_tests_reported": 18
+      "focused_tests": 18
     }
   ],
   "components": [
@@ -132,12 +156,17 @@
     "docs/kanban-autonomous-supervisor/STATUS.md",
     "docs/kanban-autonomous-supervisor/SPEC.md",
     "docs/kanban-autonomous-supervisor/ROADMAP.md",
-    "docs/kanban-autonomous-supervisor/CHECKPOINTS.md",
+    "docs/kanban-autonomous-supervisor/CHECKPOINTS-CURRENT.md",
     "docs/kanban-autonomous-supervisor/EVIDENCE.md",
     "docs/kanban-autonomous-supervisor/CHANGELOG.md",
     "docs/kanban-autonomous-supervisor/MANIFEST.json"
   ],
   "historical_documents": [
+    {
+      "path": "docs/kanban-autonomous-supervisor/CHECKPOINTS.md",
+      "role": "original cumulative checkpoint ledger",
+      "live_status": false
+    },
     {
       "path": "docs/plans/r3-roadmap-bundle.json",
       "role": "R3 architecture consultation input",
@@ -163,6 +192,7 @@
     "durable SQLite mission state",
     "Git commits and merged PR metadata",
     "MANIFEST.json",
+    "CHECKPOINTS-CURRENT.md",
     "STATUS.md",
     "SPEC.md",
     "ROADMAP.md",
