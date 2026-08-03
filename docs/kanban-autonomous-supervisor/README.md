@@ -4,8 +4,8 @@
 > `arumihsnek/hermes-agent`.
 >
 > Snapshot time: `2026-08-03T22:57:00+02:00`  
-> Published `main`: `337d698e1affa5a0195da641a74e8a1fa42ac3a8`  
-> Active delivery: R7 PR #20, head `1d20e08490c3e7b6def43a9e57b0e3cd47c127a4`
+> Published `main`: `734529568fa094ceabbe95aaf0bbc8c0e7e1abad`  
+> Latest delivery: R7 merged by PR #20 at `734529568fa094ceabbe95aaf0bbc8c0e7e1abad`
 
 ## Read this first
 
@@ -41,8 +41,8 @@ and collected test set are identical.
 - R4 durable human-decision core: merged.
 - R5 roadmap executor: merged.
 - R6 component-level end-to-end canary: merged.
-- R7 adoption hardening: open in PR #20, not yet part of `main`.
-- The original objective is **not yet fully accepted** because the published canary
+- R7 adoption hardening: merged in PR #20.
+- The implementation roadmap R2–R7 is merged, but the original objective is **not yet fully accepted** because the published canary
   simulates senior consultation and human response inside a test process. A real Hermes
   chat transport, a true process/session handoff, and controlled operational adoption
   remain explicit acceptance gates.
