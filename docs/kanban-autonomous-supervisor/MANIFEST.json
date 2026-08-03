@@ -1,14 +1,17 @@
 {
   "document_type": "kanban_autonomous_supervisor_manifest",
   "schema_version": "1.0.0",
-  "generated_at": "2026-08-03T23:03:00+02:00",
+  "generated_at": "2026-08-03T23:15:00+02:00",
   "repository": "arumihsnek/hermes-agent",
   "official_upstream_reference": "NousResearch/hermes-agent",
   "default_branch": "main",
-  "published_head": "734529568fa094ceabbe95aaf0bbc8c0e7e1abad",
   "mission_id": "kanban-autonomous-supervisor",
   "mission_complete": false,
   "current_phase": "operational_acceptance",
+  "repository_head": "163b8dd488b77d4cf0ba19ab04d47e42a9c03bac",
+  "runtime_implementation_head": "734529568fa094ceabbe95aaf0bbc8c0e7e1abad",
+  "documentation_merge_pr": 21,
+  "documentation_merge_sha": "163b8dd488b77d4cf0ba19ab04d47e42a9c03bac",
   "active_delivery": {
     "type": "post_merge_acceptance",
     "r7_pr": 20,
@@ -156,7 +159,7 @@
     "supervisor-driven exact-head review and personal PR lifecycle"
   ],
   "source_of_truth_order": [
-    "exact code and migrations at published head",
+    "exact code and migrations at runtime implementation head",
     "durable SQLite mission state",
     "Git commits and merged PR metadata",
     "MANIFEST.json",
