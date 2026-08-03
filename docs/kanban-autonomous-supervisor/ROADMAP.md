@@ -2,7 +2,7 @@
 
 > Canonical current roadmap  
 > Updated: 2026-08-03  
-> Published main at update: `337d698e1affa5a0195da641a74e8a1fa42ac3a8`
+> Published main at update: `734529568fa094ceabbe95aaf0bbc8c0e7e1abad`
 
 ## North-star outcome
 
@@ -24,7 +24,7 @@ A phase may be implemented without the whole mission being operationally accepte
 | R4 Human-decision core | Merged | Real chat transport not proven |
 | R5 Roadmap executor | Merged | Self-hosting not proven |
 | R6 Integrated canary | Merged | Component-level; real senior/chat/process not proven |
-| R7 Adoption hardening | Open PR #20 | Pending |
+| R7 Adoption hardening | Merged | Partial operational proof |
 
 ## R0 — Investigation
 
@@ -122,9 +122,9 @@ R6 proves component integration. It does not yet prove:
 
 ## R7 — Adoption and hardening
 
-### Current delivery
+### Delivered
 
-PR #20 is open with:
+PR #20 merged at `734529568fa094ceabbe95aaf0bbc8c0e7e1abad` with:
 
 - exponential backoff;
 - repeated-error fingerprinting;
@@ -134,11 +134,11 @@ PR #20 is open with:
 - non-destructive mission test;
 - additive rollback-safety tests.
 
-### Required before phase completion
+### Remaining acceptance work after implementation merge
 
-- [ ] PR #20 reviewed against this specification.
-- [ ] P0 and P1 findings equal zero.
-- [ ] R2–R6 regression suite remains green.
+- [x] PR #20 merged into personal `main`.
+- [ ] Independent review confirms no P0/P1 operational gaps.
+- [ ] R2–R7 regression suite remains green under a documented exact command.
 - [ ] Loop limits are actually enforced in execution paths, not only defined and tested
       as constants/helpers.
 - [ ] Failure fingerprints are persisted or otherwise used to stop repeated loops.
