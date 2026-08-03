@@ -226,11 +226,11 @@ A simulated callback is sufficient for unit tests but not for final operational 
 
 ### Library acceptance
 
-R2–R6 merged and focused tests passing.
+R2–R7 merged and focused tests passing.
 
 ### Integration acceptance
 
-Requires R7 merge plus real transport, process-level resume, and self-hosting canaries.
+R7 is merged; integration acceptance still requires real transport, process-level resume, and self-hosting canaries.
 
 ### Operational acceptance
 
