@@ -59,8 +59,20 @@ MAX_LEASE_TTL = 7200
 # Default max attempts per slice before queue_exhausted
 DEFAULT_MAX_ATTEMPTS = 3
 
-# Backoff base in seconds
+# Maximum corrections per finding before human escalation
+MAX_CORRECTIONS_PER_FINDING = 5
+
+# Maximum identical consecutive failures before giving up
+MAX_IDENTICAL_FAILURES = 3
+
+# Backoff base in seconds (exponential backoff)
 BACKOFF_BASE_S = 5
+
+# Maximum backoff in seconds
+BACKOFF_MAX_S = 300
+
+# Maximum total ticks per supervisor session (budget)
+MAX_TICKS_PER_SESSION = 1000
 
 # R1 schema: slice object allowed keys
 _SLICE_VALID_KEYS = frozenset({
@@ -192,6 +204,26 @@ def _now_s() -> int:
 
 def _new_operation_id() -> str:
     return "op_" + secrets.token_hex(4)
+
+
+def _compute_backoff(attempt: int) -> float:
+    """Compute exponential backoff with cap.
+
+    Returns delay in seconds: BASE * 2^attempt, capped at BACKOFF_MAX_S.
+    """
+    import math
+    delay = BACKOFF_BASE_S * (2 ** min(attempt, 20))
+    return min(delay, BACKOFF_MAX_S)
+
+
+def _fingerprint_error(error) -> str:
+    """Compute a fingerprint for an error to detect identical failures."""
+    if isinstance(error, dict):
+        import hashlib, json
+        payload = json.dumps(error, sort_keys=True, separators=(",", ":"),
+                             ensure_ascii=False, allow_nan=False)
+        return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+    return str(error)
 
 
 # ---------------------------------------------------------------------------
