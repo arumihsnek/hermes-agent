@@ -1,9 +1,10 @@
 # Kanban Autonomous Supervisor Roadmap
 
 > Mission: `kanban-autonomous-supervisor`  
-> Updated: `2026-08-03T22:57:00+02:00`  
-> Published main: `337d698e1affa5a0195da641a74e8a1fa42ac3a8`  
-> Current phase: R7  
+> Updated: `2026-08-03T23:03:00+02:00`  
+> Published main: `734529568fa094ceabbe95aaf0bbc8c0e7e1abad`  
+> Current phase: operational acceptance  
+> Implementation phases R2–R7 merged: **yes**  
 > Mission complete: **no**
 
 This file is the public roadmap mirror. The canonical documentation set is:
@@ -31,7 +32,7 @@ be interpreted as live phase status.
 | R4 | Durable human-decision core | Merged | personal PR #17, merge `d12aca85...` |
 | R5 | Autonomous JSON roadmap executor | Merged | personal PR #18, merge `d5d7d99d...` |
 | R6 | Integrated component canary | Merged | personal PR #19, merge `337d698e...` |
-| R7 | Adoption and hardening | Active | personal PR #20, head `1d20e084...` |
+| R7 | Adoption and hardening | Merged | personal PR #20, merge `73452956...` |
 
 ## Frozen architectural decisions
 
@@ -46,14 +47,15 @@ be interpreted as live phase status.
 
 ## Current interpretation
 
-R2–R6 are merged and provide a strong library-level implementation. R6 demonstrates that
-those components compose in one test scenario, but its senior consultation and human
-response are simulated and its restart is a database reopen inside a test process.
+R2–R7 are merged and provide a strong library-level implementation. R6 demonstrates that
+R2–R5 compose in one test scenario, and R7 adds loop-hardening helpers and adoption tests.
+However, the integrated canary still simulates senior consultation and human response,
+and its restart is a database reopen inside one test process.
 
-Therefore the original objective is not yet fully demonstrated. R7 and the final adoption
-gates must still prove:
+Therefore the original objective is not yet fully demonstrated. The final acceptance work
+must still prove:
 
-- actual runtime use of loop bounds and backoff;
+- actual runtime use of loop bounds, failure fingerprints and backoff;
 - a real Hermes chat transport for human gates;
 - a real `codex-senior-consult` call bound to mission state;
 - recovery by a distinct process or Hermes session;
@@ -63,6 +65,7 @@ gates must still prove:
 
 ## Next safe action
 
-Review PR #20 against the complete R7 acceptance criteria in the canonical
-[`ROADMAP.md`](../kanban-autonomous-supervisor/ROADMAP.md). Do not declare the mission
-complete solely from the focused hardening tests.
+Audit the merged R7 runtime against the complete acceptance criteria in the canonical
+[`ROADMAP.md`](../kanban-autonomous-supervisor/ROADMAP.md), then execute the real chat,
+process-handoff, self-hosting and controlled-adoption canaries. Do not declare the mission
+complete solely because all implementation PRs are merged.
