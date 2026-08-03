@@ -11,6 +11,7 @@
   "repository_head_observed_before_verification_update": "ed5622aa3926805167ceea42c70c21fde1def73c",
   "runtime_implementation_head": "734529568fa094ceabbe95aaf0bbc8c0e7e1abad",
   "documentation_merge_prs": [21, 22],
+  "current_checkpoint": "docs/kanban-autonomous-supervisor/CHECKPOINTS-CURRENT.md",
   "verification": {
     "verified_at": "2026-08-03T23:28:00+02:00",
     "target": "personal-product/main",
@@ -155,12 +156,17 @@
     "docs/kanban-autonomous-supervisor/STATUS.md",
     "docs/kanban-autonomous-supervisor/SPEC.md",
     "docs/kanban-autonomous-supervisor/ROADMAP.md",
-    "docs/kanban-autonomous-supervisor/CHECKPOINTS.md",
+    "docs/kanban-autonomous-supervisor/CHECKPOINTS-CURRENT.md",
     "docs/kanban-autonomous-supervisor/EVIDENCE.md",
     "docs/kanban-autonomous-supervisor/CHANGELOG.md",
     "docs/kanban-autonomous-supervisor/MANIFEST.json"
   ],
   "historical_documents": [
+    {
+      "path": "docs/kanban-autonomous-supervisor/CHECKPOINTS.md",
+      "role": "original cumulative checkpoint ledger",
+      "live_status": false
+    },
     {
       "path": "docs/plans/r3-roadmap-bundle.json",
       "role": "R3 architecture consultation input",
@@ -186,6 +192,7 @@
     "durable SQLite mission state",
     "Git commits and merged PR metadata",
     "MANIFEST.json",
+    "CHECKPOINTS-CURRENT.md",
     "STATUS.md",
     "SPEC.md",
     "ROADMAP.md",
