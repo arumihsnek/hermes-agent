@@ -2288,6 +2288,10 @@ def connect(
                     # import — a missing module is an init failure that must surface.
                     from hermes_cli.kanban_mission_state import migrate_mission_state
                     migrate_mission_state(conn)
+                    # R3 durable supervisor tables.  Lazy import avoids circular
+                    # dependency.  Same pattern as R2 migration.
+                    from hermes_cli.kanban_supervisor import migrate_supervisor
+                    migrate_supervisor(conn)
                     _INITIALIZED_PATHS.add(resolved)
         except Exception:
             conn.close()
