@@ -3,6 +3,30 @@
 This changelog records the personal product line in `arumihsnek/hermes-agent`. It does not
 claim changes were accepted by the official upstream repository.
 
+## 2026-08-03 — Clean combined R2–R7 verification
+
+Fresh verification on merged `personal-product/main` completed with:
+
+```text
+239 passed
+0 failed
+RC=0
+```
+
+Canonical non-overlapping breakdown:
+
+- R2 mission-state: 108.
+- R3 supervisor: 55.
+- R4 human gate: 33.
+- R5 roadmap executor: 18.
+- R6 canary: 7.
+- R7 hardening: 18.
+
+The six subtotals sum exactly to 239. This resolves the historical aggregate-count
+confusion in PR and commit descriptions. The earlier R2 figure of 138 bundled 30 general
+Kanban DB tests with the 108 mission-state tests and is therefore not used in this
+non-overlapping aggregate.
+
 ## 2026-08-03 — R7 adoption hardening merged
 
 - PR #20 merged from `codex/kanban-adoption-hardening`.
@@ -10,7 +34,7 @@ claim changes were accepted by the official upstream repository.
 - Adds correction and identical-failure limits, exponential backoff, error
   fingerprinting, session tick budget, fresh-install checks, a non-destructive mission
   test, and rollback-safety checks.
-- Reported focused tests: 18/18.
+- Focused tests: 18/18.
 - Merge commit: `734529568fa094ceabbe95aaf0bbc8c0e7e1abad`.
 - Status: merged into personal `main`.
 
@@ -68,7 +92,9 @@ claim changes were accepted by the official upstream repository.
 - Adds `hermes_cli/kanban_mission_state.py`.
 - Adds mission current state, operation journal, generation CAS, canonical fingerprint,
   replay/conflict handling, R1 validation and automatic migration.
-- Focused tests: 108 mission-state + 30 Kanban DB = 138/138.
+- Canonical mission-state focused tests: 108/108.
+- Historical R2 closure additionally ran 30 `test_kanban_db.py` tests, yielding the
+  previously reported combined 138/138 figure.
 
 ## R1 — Contract freeze
 
@@ -84,6 +110,6 @@ claim changes were accepted by the official upstream repository.
 
 ## Evidence policy
 
-Full-suite totals in historical PR descriptions differ because the collected test scope
-changed between runs. This changelog treats exact focused suites and exact commit/PR
-identity as the stable phase evidence.
+The canonical current aggregate is the exact non-overlapping R2–R7 focused scope:
+239/239 with RC=0. Historical totals remain records of their original collected scopes,
+not competing current totals.
