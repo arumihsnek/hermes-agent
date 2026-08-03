@@ -6,20 +6,20 @@ use SQLite as their runtime source of truth.
 ## Current checkpoint
 
 ```text
-checkpoint_id=kanban-autonomous-supervisor-20260803-2257
+checkpoint_id=kanban-autonomous-supervisor-20260803-2303
 repository=arumihsnek/hermes-agent
-published_main=337d698e1affa5a0195da641a74e8a1fa42ac3a8
-completed_through=R6
-active_phase=R7
-active_pr=20
-active_head=1d20e08490c3e7b6def43a9e57b0e3cd47c127a4
+published_main=734529568fa094ceabbe95aaf0bbc8c0e7e1abad
+implementation_completed_through=R7
+active_phase=operational_acceptance
+r7_pr=20
+r7_merge=734529568fa094ceabbe95aaf0bbc8c0e7e1abad
 mission_complete=false
 ```
 
 ### Next safe action
 
-Review PR #20 against the R7 acceptance criteria in `ROADMAP.md`. Do not declare the
-mission complete merely because the focused hardening tests pass.
+Audit the merged R7 runtime against the operational acceptance criteria in `ROADMAP.md`.
+Do not declare the mission complete merely because all implementation phases are merged.
 
 ## Phase checkpoints
 
@@ -106,20 +106,21 @@ focused_tests=7
 
 ```text
 pr=20
-state=open
+state=merged
 head=1d20e08490c3e7b6def43a9e57b0e3cd47c127a4
+merge=734529568fa094ceabbe95aaf0bbc8c0e7e1abad
 focused_tests_reported=18
 ```
 
 - Proposed loop bounds, backoff, fingerprinting, fresh-install and rollback checks.
-- Not yet merged.
-- Must be reviewed for actual runtime enforcement and remaining operational gates.
+- Merged into personal `main`.
+- Still requires review for actual runtime enforcement and remaining operational gates.
 
 ## Resume checklist for a new session
 
 1. Read `README.md`, `STATUS.md`, `SPEC.md`, and `ROADMAP.md` in this directory.
 2. Read `MANIFEST.json` and verify `published_head` against `personal-product/main`.
-3. Inspect PR #20 and its exact head.
-4. Reconcile any new merge into this ledger before further implementation.
+3. Verify R7 merge `734529568fa094ceabbe95aaf0bbc8c0e7e1abad` is still an ancestor of personal `main`.
+4. Reconcile any later operational-adoption commits into this ledger.
 5. Preserve the distinction between implementation tests and operational proof.
 6. Continue only from the recorded next safe action.
