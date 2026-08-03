@@ -2292,6 +2292,9 @@ def connect(
                     # dependency.  Same pattern as R2 migration.
                     from hermes_cli.kanban_supervisor import migrate_supervisor
                     migrate_supervisor(conn)
+                    # R4 durable human decision channel tables.
+                    from hermes_cli.kanban_human_gate import migrate_human_gate
+                    migrate_human_gate(conn)
                     _INITIALIZED_PATHS.add(resolved)
         except Exception:
             conn.close()
