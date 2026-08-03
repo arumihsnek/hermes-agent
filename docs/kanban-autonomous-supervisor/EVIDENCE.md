@@ -22,7 +22,7 @@
 | System survives a real session handoff | Not yet demonstrated | Low | Required final canary |
 | User can answer through Hermes chat | Not yet demonstrated | Low | Real adapter required |
 | Supervisor self-hosts a roadmap | Not yet demonstrated | Low | Required final canary |
-| Loop hardening is implemented | R7 PR #20 | Medium | Open PR; runtime enforcement review needed |
+| Loop hardening helpers are merged | R7 PR #20 | Medium-high | Runtime enforcement review still needed |
 
 ## Exact delivery evidence
 
@@ -33,7 +33,7 @@
 | R4 | 17 | `f7177f2e...` | `d12aca85...` | 33 |
 | R5 | 18 | `047c7bb9...` | `d5d7d99d...` | 18 |
 | R6 | 19 | `cde68ad7...` | `337d698e...` | 7 |
-| R7 | 20 | `1d20e084...` | not merged | 18 reported |
+| R7 | 20 | `1d20e084...` | `73452956...` | 18 reported |
 
 ## Historical reporting discrepancies
 
