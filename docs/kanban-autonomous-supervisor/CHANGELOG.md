@@ -3,15 +3,16 @@
 This changelog records the personal product line in `arumihsnek/hermes-agent`. It does not
 claim changes were accepted by the official upstream repository.
 
-## 2026-08-03 — R7 adoption hardening proposed
+## 2026-08-03 — R7 adoption hardening merged
 
-- PR #20 opened from `codex/kanban-adoption-hardening`.
+- PR #20 merged from `codex/kanban-adoption-hardening`.
 - Head: `1d20e08490c3e7b6def43a9e57b0e3cd47c127a4`.
 - Adds correction and identical-failure limits, exponential backoff, error
   fingerprinting, session tick budget, fresh-install checks, a non-destructive mission
   test, and rollback-safety checks.
 - Reported focused tests: 18/18.
-- Status: **open; not part of `main`**.
+- Merge commit: `734529568fa094ceabbe95aaf0bbc8c0e7e1abad`.
+- Status: merged into personal `main`.
 
 ## 2026-08-03 — R6 integrated component canary
 
