@@ -269,12 +269,64 @@ def load_env_file(env_path: Path) -> Dict[str, str]:
     return secrets
 
 
-def build_profile_secret_scope(hermes_home: Path) -> Dict[str, str]:
-    """Build a profile's secret mapping from its ``<home>/.env``.
+def _managed_profile_name(home: Path) -> str | None:
+    """Resolve the launcher-authorized profile identity from active home."""
+    try:
+        from hermes_constants import get_default_hermes_root
+
+        root = Path(get_default_hermes_root()).resolve()
+        resolved = home.resolve()
+        if resolved == root:
+            return "default"
+        relative = resolved.relative_to(root / "profiles")
+        if len(relative.parts) == 1:
+            return relative.parts[0]
+    except (ImportError, OSError, ValueError):
+        pass
+    return None
+
+
+def _managed_profile_is_authorized(profile_name: str | None) -> bool:
+    """Require an explicit launcher allowlist before importing managed values."""
+    if not profile_name:
+        return False
+    allowed = {
+        item.strip()
+        for item in os.environ.get("HERMES_MANAGED_PROFILES", "").split(",")
+        if item.strip()
+    }
+    return profile_name in allowed
+
+
+def _managed_provider_secret_names() -> frozenset[str]:
+    """Return provider credential names; unknown managed names stay excluded."""
+    try:
+        from hermes_cli.auth import PROVIDER_REGISTRY
+
+        return frozenset(
+            name
+            for provider in PROVIDER_REGISTRY.values()
+            for name in provider.api_key_env_vars
+        )
+    except Exception:
+        return frozenset()
+
+
+def build_profile_secret_scope(
+    hermes_home: Path,
+) -> Dict[str, str]:
+    """Build a profile's secret mapping from supported secret sources.
 
     Returns a fresh dict (safe to install via ``set_secret_scope``). Genuinely
     global vars are intentionally NOT copied in — ``get_secret`` reads those
     from ``os.environ`` directly, so the scope holds only profile secrets.
+
+    Source precedence is deterministic: profile-local values, then the
+    supported external profile source, then the managed central source. The
+    managed source is accepted only for a launcher-authorized profile
+    (``HERMES_MANAGED_PROFILES``) and for provider credential names known to
+    the provider registry. Missing or invalid managed configuration contributes
+    no values and therefore fails closed.
     """
     home = Path(hermes_home)
     secrets = load_env_file(home / ".env")
@@ -287,6 +339,29 @@ def build_profile_secret_scope(hermes_home: Path) -> Dict[str, str]:
 
     for key, value in external_secrets.items():
         if _is_global_env(key):
+            continue
+        secrets[key] = value
+
+    # A managed environment is the deployment-level source of truth for
+    # isolated profile homes.  ``load_hermes_dotenv`` applies it to
+    # ``os.environ`` so single-profile callers can resolve credentials, but a
+    # multiplexed scope is intentionally authoritative and cannot fall back to
+    # that process-global mapping.  Include the managed values in the
+    # per-profile in-memory scope without creating a profile-local .env copy.
+    try:
+        from hermes_cli.managed_scope import load_managed_env
+
+        managed_secrets = load_managed_env()
+    except Exception:
+        managed_secrets = {}
+
+    managed_name = _managed_profile_name(home)
+    managed_names = _managed_provider_secret_names()
+    if not _managed_profile_is_authorized(managed_name):
+        managed_secrets = {}
+
+    for key, value in managed_secrets.items():
+        if _is_global_env(key) or key not in managed_names:
             continue
         secrets[key] = value
 

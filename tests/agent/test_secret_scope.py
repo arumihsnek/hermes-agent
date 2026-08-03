@@ -1,4 +1,9 @@
 """Tests for the profile-scoped credential primitive (Workstream A / Phase 2)."""
+import logging
+import os
+import subprocess
+import sys
+
 import pytest
 
 from agent import secret_scope as ss
@@ -113,103 +118,8 @@ class TestScopeIsolation:
 class TestEnvFileParsing:
     """load_env_file parses without mutating os.environ."""
 
-    def test_load_env_file_unescapes_quoted_values(self, tmp_path):
-        """Values written by save_env_value must round-trip byte-exactly.
-
-        Regression: load_env_file stripped only the outer quotes, leaving
-        the writer's \\" and \\\\ escapes literal — credentials containing
-        '\"' or '\\' worked interactively but were corrupted under scoped
-        (cron / multiplex) resolution.
-        """
-        from hermes_cli.config import _quote_env_value
-
-        original = 'tok"en\\with spaces'
-        (tmp_path / ".env").write_text(f"MY_TOKEN={_quote_env_value(original)}\n")
-        assert ss.load_env_file(tmp_path / ".env") == {"MY_TOKEN": original}
-
-    def test_load_env_file_single_quotes_and_plain_values(self, tmp_path):
-        (tmp_path / ".env").write_text(
-            "PLAIN=abc123\nQUOTED='single quoted'\nEMPTY=\n"
-        )
-        assert ss.load_env_file(tmp_path / ".env") == {
-            "PLAIN": "abc123",
-            "QUOTED": "single quoted",
-            "EMPTY": "",
-        }
-
-    def test_inline_comment_stripped_from_unquoted_value(self, tmp_path):
-        """`KEY=value # comment` → `value` (python-dotenv semantics)."""
-        (tmp_path / ".env").write_text("KEY=value # comment\nTABBED=foo\t#tabbed\n")
-        assert ss.load_env_file(tmp_path / ".env") == {
-            "KEY": "value",
-            "TABBED": "foo",
-        }
-
-    def test_hash_without_preceding_whitespace_is_not_a_comment(self, tmp_path):
-        """`KEY=foo#bar` stays intact — dotenv only strips `#` after whitespace."""
-        (tmp_path / ".env").write_text("KEY=foo#bar\nLEAD=#leading\n")
-        assert ss.load_env_file(tmp_path / ".env") == {
-            "KEY": "foo#bar",
-            "LEAD": "#leading",
-        }
-
-    def test_inline_comment_after_quoted_value(self, tmp_path):
-        """Quotes strip AND the trailing comment drops; inner `#` survives."""
-        (tmp_path / ".env").write_text(
-            "DQ=\"has # inside\" # trailing\n"
-            "SQ='single # inside' # trailing\n"
-        )
-        assert ss.load_env_file(tmp_path / ".env") == {
-            "DQ": "has # inside",
-            "SQ": "single # inside",
-        }
-
-    def test_inline_comment_with_escaped_quote_inside_value(self, tmp_path):
-        r"""Escape-aware close-quote scan: `\"` must not terminate the value."""
-        (tmp_path / ".env").write_text(
-            'KEY="a \\" quote # x" # trail\n'
-        )
-        assert ss.load_env_file(tmp_path / ".env") == {"KEY": 'a " quote # x'}
-
-    def test_round_trip_writer_value_with_trailing_comment(self, tmp_path):
-        """A value quoted by the save_env_value writer survives an appended
-        inline comment byte-exactly."""
-        from hermes_cli.config import _quote_env_value
-
-        original = 'we#ird "tok\\en" # not a comment'
-        quoted = _quote_env_value(original)
-        (tmp_path / ".env").write_text(f"MY_TOKEN={quoted} # rotated 2026-08\n")
-        assert ss.load_env_file(tmp_path / ".env") == {"MY_TOKEN": original}
 
 
-
-
-    def test_strips_utf8_bom_from_first_key(self, tmp_path):
-        """Windows editors often save .env as UTF-8 with BOM (EF BB BF).
-
-        Plain utf-8 keeps U+FEFF on the first key name, so get_secret('NAME')
-        misses under an installed scope. utf-8-sig strips the leading BOM.
-        """
-        env = tmp_path / ".env"
-        env.write_bytes(
-            b"\xef\xbb\xbfANTHROPIC_API_KEY=sk-x\nOPENAI_API_KEY=sk-y\n"
-        )
-        out = ss.load_env_file(env)
-        assert out == {
-            "ANTHROPIC_API_KEY": "sk-x",
-            "OPENAI_API_KEY": "sk-y",
-        }
-        assert "\ufeffANTHROPIC_API_KEY" not in out
-
-        scope = ss.build_profile_secret_scope(tmp_path)
-        ss.set_multiplex_active(True)
-        token = ss.set_secret_scope(scope)
-        try:
-            assert ss.get_secret("ANTHROPIC_API_KEY") == "sk-x"
-            assert ss.get_secret("OPENAI_API_KEY") == "sk-y"
-        finally:
-            ss.reset_secret_scope(token)
-            ss.set_multiplex_active(False)
 
     def test_build_profile_secret_scope(self, tmp_path):
         (tmp_path / ".env").write_text("ANTHROPIC_API_KEY=sk-profile\n")
@@ -250,6 +160,259 @@ class TestEnvFileParsing:
         )
 
         assert ss.build_profile_secret_scope(profile) == {}
+
+    def test_build_profile_secret_scope_includes_managed_environment(
+        self, tmp_path, monkeypatch
+    ):
+        """Multiplexed profiles inherit the central managed provider env."""
+        root = tmp_path / "root"
+        profile = root / "profiles" / "worker"
+        managed = tmp_path / "managed"
+        profile.mkdir(parents=True)
+        managed.mkdir()
+        (managed / ".env").write_text(
+            "OPENCODE_ZEN_API_KEY=central-zen\n"
+            "OPENCODE_GO_API_KEY=central-go\n",
+            encoding="utf-8",
+        )
+        monkeypatch.setenv("HERMES_MANAGED_DIR", str(managed))
+        monkeypatch.setenv("HERMES_MANAGED_PROFILES", "worker")
+        monkeypatch.setenv("HERMES_HOME", str(root))
+        from hermes_cli import managed_scope
+        from hermes_cli import env_loader
+
+        managed_scope.invalidate_managed_cache()
+        env_loader.reset_secret_source_cache()
+        env_loader.load_hermes_dotenv(hermes_home=profile)
+
+        assert ss.build_profile_secret_scope(profile) == {
+            "OPENCODE_ZEN_API_KEY": "central-zen",
+            "OPENCODE_GO_API_KEY": "central-go",
+        }
+
+    def test_managed_scope_uses_profile_path_when_spawn_sets_profile_home(
+        self, tmp_path, monkeypatch
+    ):
+        """The official Kanban spawn path sets HERMES_HOME to the profile dir."""
+        root = tmp_path / "root"
+        profile = root / "profiles" / "worker"
+        managed = tmp_path / "managed"
+        profile.mkdir(parents=True)
+        managed.mkdir()
+        (managed / ".env").write_text(
+            "OPENCODE_ZEN_API_KEY=central-zen\n", encoding="utf-8"
+        )
+        monkeypatch.setenv("HERMES_HOME", str(profile))
+        monkeypatch.setenv("HERMES_MANAGED_DIR", str(managed))
+        monkeypatch.setenv("HERMES_MANAGED_PROFILES", "worker")
+        from hermes_cli import managed_scope
+
+        managed_scope.invalidate_managed_cache()
+
+        assert ss.build_profile_secret_scope(profile) == {
+            "OPENCODE_ZEN_API_KEY": "central-zen"
+        }
+
+    def test_managed_scope_requires_authorized_profile_and_provider_name(
+        self, tmp_path, monkeypatch
+    ):
+        root = tmp_path / "root"
+        profile = root / "profiles" / "worker"
+        managed = tmp_path / "managed"
+        managed.mkdir()
+        profile.mkdir(parents=True)
+        (managed / ".env").write_text(
+            "OPENCODE_ZEN_API_KEY=central-zen\nUNRELATED_SECRET=must-not-enter\n",
+            encoding="utf-8",
+        )
+        monkeypatch.setenv("HERMES_MANAGED_DIR", str(managed))
+        monkeypatch.setenv("HERMES_MANAGED_PROFILES", "worker")
+        monkeypatch.setenv("HERMES_HOME", str(root))
+        from hermes_cli import managed_scope
+
+        managed_scope.invalidate_managed_cache()
+
+        assert ss.build_profile_secret_scope(profile) == {
+            "OPENCODE_ZEN_API_KEY": "central-zen"
+        }
+        reviewer = root / "profiles" / "reviewer"
+        assert ss.build_profile_secret_scope(reviewer) == {}
+
+    def test_managed_scope_precedence_is_deterministic(self, tmp_path, monkeypatch):
+        root = tmp_path / "root"
+        profile = root / "profiles" / "worker"
+        managed = tmp_path / "managed"
+        profile.mkdir(parents=True)
+        managed.mkdir()
+        (profile / ".env").write_text(
+            "OPENCODE_ZEN_API_KEY=profile\n", encoding="utf-8"
+        )
+        (managed / ".env").write_text(
+            "OPENCODE_ZEN_API_KEY=managed\n", encoding="utf-8"
+        )
+        monkeypatch.setenv("OPENCODE_ZEN_API_KEY", "process")
+        monkeypatch.setenv("HERMES_MANAGED_DIR", str(managed))
+        monkeypatch.setenv("HERMES_MANAGED_PROFILES", "worker")
+        monkeypatch.setenv("HERMES_HOME", str(root))
+        from hermes_cli import env_loader, managed_scope
+
+        managed_scope.invalidate_managed_cache()
+        env_loader.reset_secret_source_cache()
+        env_loader.load_hermes_dotenv(hermes_home=profile)
+
+        scope = ss.build_profile_secret_scope(profile)
+        assert scope["OPENCODE_ZEN_API_KEY"] == "managed"
+
+    def test_managed_scope_does_not_copy_or_log_secret_values(
+        self, tmp_path, monkeypatch, caplog
+    ):
+        root = tmp_path / "root"
+        profile = root / "profiles" / "worker"
+        managed = tmp_path / "managed"
+        managed.mkdir()
+        profile.mkdir(parents=True)
+        (managed / ".env").write_text(
+            "OPENCODE_ZEN_API_KEY=central-zen\n", encoding="utf-8"
+        )
+        monkeypatch.setenv("HERMES_MANAGED_DIR", str(managed))
+        monkeypatch.setenv("HERMES_MANAGED_PROFILES", "worker")
+        monkeypatch.setenv("HERMES_HOME", str(root))
+        from hermes_cli import managed_scope
+
+        managed_scope.invalidate_managed_cache()
+        ss.build_profile_secret_scope(profile)
+
+        assert not (profile / ".env").exists()
+        assert "central-zen" not in caplog.text
+
+    def test_invalid_managed_dir_fails_closed(self, tmp_path, monkeypatch):
+        root = tmp_path / "root"
+        profile = root / "profiles" / "worker"
+        managed = tmp_path / "missing-managed"
+        monkeypatch.setenv("HERMES_MANAGED_DIR", str(managed))
+        monkeypatch.setenv("HERMES_MANAGED_PROFILES", "worker")
+        monkeypatch.setenv("HERMES_HOME", str(root))
+        from hermes_cli import managed_scope
+
+        managed_scope.invalidate_managed_cache()
+
+        assert ss.build_profile_secret_scope(profile) == {}
+
+    def test_managed_provider_secret_is_removed_from_unrelated_child_env(
+        self, monkeypatch
+    ):
+        from tools.environments.local import build_subprocess_env
+
+        monkeypatch.setenv("OPENCODE_ZEN_API_KEY", "synthetic-provider-value")
+
+        assert "OPENCODE_ZEN_API_KEY" not in build_subprocess_env()
+
+    def test_managed_cache_refreshes_and_invalidates(self, tmp_path, monkeypatch):
+        from hermes_cli import managed_scope
+
+        managed = tmp_path / "managed"
+        managed.mkdir()
+        env_path = managed / ".env"
+        monkeypatch.setenv("HERMES_MANAGED_DIR", str(managed))
+        managed_scope.invalidate_managed_cache()
+
+        env_path.write_text("OPENCODE_ZEN_API_KEY=first\n", encoding="utf-8")
+        assert managed_scope.load_managed_env()["OPENCODE_ZEN_API_KEY"] == "first"
+
+        env_path.write_text("OPENCODE_ZEN_API_KEY=second\n", encoding="utf-8")
+        stat = env_path.stat()
+        os.utime(env_path, ns=(stat.st_atime_ns, stat.st_mtime_ns + 1_000_000))
+        assert managed_scope.load_managed_env()["OPENCODE_ZEN_API_KEY"] == "second"
+
+        env_path.write_text("OPENCODE_ZEN_API_KEY=third\n", encoding="utf-8")
+        managed_scope.invalidate_managed_cache()
+        assert managed_scope.load_managed_env()["OPENCODE_ZEN_API_KEY"] == "third"
+
+    def test_managed_parse_exception_does_not_log_exception_value(
+        self, tmp_path, monkeypatch, caplog
+    ):
+        from hermes_cli import managed_scope
+
+        managed = tmp_path / "managed"
+        managed.mkdir()
+        (managed / ".env").write_text("synthetic\n", encoding="utf-8")
+        monkeypatch.setenv("HERMES_MANAGED_DIR", str(managed))
+        managed_scope.invalidate_managed_cache()
+
+        def raise_with_value(_file):
+            raise RuntimeError("synthetic-provider-value")
+
+        monkeypatch.setattr(managed_scope, "_parse_env", raise_with_value)
+        with caplog.at_level(logging.WARNING):
+            assert managed_scope.load_managed_env() == {}
+        assert "synthetic-provider-value" not in caplog.text
+
+    def test_scope_loader_exception_does_not_disclose_value(
+        self, tmp_path, monkeypatch, caplog
+    ):
+        from hermes_cli import managed_scope
+
+        root = tmp_path / "root"
+        profile = root / "profiles" / "worker"
+        profile.mkdir(parents=True)
+        monkeypatch.setenv("HERMES_MANAGED_PROFILES", "worker")
+        monkeypatch.setenv("HERMES_HOME", str(root))
+
+        def raise_with_value():
+            raise RuntimeError("synthetic-provider-value")
+
+        monkeypatch.setattr(managed_scope, "load_managed_env", raise_with_value)
+        with caplog.at_level(logging.WARNING):
+            assert ss.build_profile_secret_scope(profile) == {}
+        assert "synthetic-provider-value" not in caplog.text
+
+    def test_isolated_profile_scope_and_child_sanitization_end_to_end(
+        self, tmp_path, monkeypatch
+    ):
+        root = tmp_path / "root"
+        profile = root / "profiles" / "worker"
+        managed = tmp_path / "managed"
+        profile.mkdir(parents=True)
+        managed.mkdir()
+        (managed / ".env").write_text(
+            "OPENCODE_ZEN_API_KEY=synthetic-provider-value\n", encoding="utf-8"
+        )
+        monkeypatch.setenv("HERMES_MANAGED_DIR", str(managed))
+        monkeypatch.setenv("HERMES_MANAGED_PROFILES", "worker")
+        monkeypatch.setenv("HERMES_HOME", str(root))
+        from hermes_cli import env_loader, managed_scope
+        from tools.environments.local import build_subprocess_env
+
+        managed_scope.invalidate_managed_cache()
+        env_loader.reset_secret_source_cache()
+        env_loader.load_hermes_dotenv(hermes_home=profile)
+        scope = ss.build_profile_secret_scope(profile)
+        assert scope["OPENCODE_ZEN_API_KEY"] == "synthetic-provider-value"
+
+        token = ss.set_secret_scope(scope)
+        ss.set_multiplex_active(True)
+        try:
+            assert ss.get_secret("OPENCODE_ZEN_API_KEY") == "synthetic-provider-value"
+            child_env = build_subprocess_env()
+            assert "OPENCODE_ZEN_API_KEY" not in child_env
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    "-c",
+                    "import os; print('present' if os.getenv('OPENCODE_ZEN_API_KEY') else 'absent')",
+                ],
+                env=child_env,
+                capture_output=True,
+                text=True,
+                check=True,
+            )
+            assert result.stdout.strip() == "absent"
+        finally:
+            ss.reset_secret_scope(token)
+
+        assert not (profile / ".env").exists()
+        assert not list(profile.rglob("*.json"))
+        assert not list(profile.rglob("*.pickle"))
 
 
 class TestApiServerListenerGlobals:

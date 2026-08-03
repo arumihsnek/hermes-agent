@@ -1283,6 +1283,37 @@ CREATE TABLE IF NOT EXISTS task_links (
     PRIMARY KEY (parent_id, child_id)
 );
 
+-- Durable planner import identity and planner-id mapping. These tables are
+-- board-local because each board has its own Kanban database. Planner IDs are
+-- not task IDs: Hermes task IDs remain internally generated and the mapping
+-- makes retries and cross-import scopes explicit.
+CREATE TABLE IF NOT EXISTS kanban_planner_imports (
+    board                TEXT NOT NULL,
+    import_id            TEXT NOT NULL,
+    schema_version       TEXT NOT NULL,
+    fingerprint_algorithm TEXT NOT NULL,
+    fingerprint          TEXT NOT NULL,
+    project_id           TEXT,
+    status               TEXT NOT NULL CHECK(status = 'committed'),
+    task_count           INTEGER NOT NULL,
+    anchor_task_id       TEXT NOT NULL,
+    created_at           INTEGER NOT NULL,
+    PRIMARY KEY (board, import_id),
+    UNIQUE (board, import_id, fingerprint_algorithm, fingerprint)
+);
+
+CREATE TABLE IF NOT EXISTS kanban_planner_task_map (
+    board           TEXT NOT NULL,
+    import_id       TEXT NOT NULL,
+    planner_task_id TEXT NOT NULL,
+    task_id         TEXT NOT NULL,
+    PRIMARY KEY (board, import_id, planner_task_id),
+    UNIQUE (board, import_id, task_id),
+    FOREIGN KEY (board, import_id)
+        REFERENCES kanban_planner_imports(board, import_id),
+    FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE RESTRICT
+);
+
 CREATE TABLE IF NOT EXISTS task_comments (
     id         INTEGER PRIMARY KEY AUTOINCREMENT,
     task_id    TEXT NOT NULL,
@@ -1368,6 +1399,7 @@ CREATE INDEX IF NOT EXISTS idx_tasks_assignee_status ON tasks(assignee, status);
 CREATE INDEX IF NOT EXISTS idx_tasks_status          ON tasks(status);
 CREATE INDEX IF NOT EXISTS idx_links_child           ON task_links(child_id);
 CREATE INDEX IF NOT EXISTS idx_links_parent          ON task_links(parent_id);
+CREATE INDEX IF NOT EXISTS idx_planner_map_task      ON kanban_planner_task_map(task_id);
 CREATE INDEX IF NOT EXISTS idx_comments_task         ON task_comments(task_id, created_at);
 CREATE INDEX IF NOT EXISTS idx_events_task           ON task_events(task_id, created_at);
 CREATE INDEX IF NOT EXISTS idx_runs_task             ON task_runs(task_id, started_at);
@@ -8991,6 +9023,41 @@ def _default_spawn(
     from hermes_cli.profiles import normalize_profile_name
 
     profile_arg = normalize_profile_name(task.assignee)
+    provider_selection = None
+    spawn_model = task.model_override
+    spawn_provider = task.provider_override
+    policy_path = os.environ.get("HERMES_KANBAN_PROVIDER_POLICY")
+    if policy_path and (task.model_override or task.provider_override):
+        from hermes_cli.kanban_provider_policy import (
+            load_available_models,
+            load_policy_artifact,
+            select_provider,
+        )
+
+        try:
+            policy = load_policy_artifact(policy_path)
+            profile_data = policy.get("profiles", {}).get(profile_arg)
+            if not isinstance(profile_data, Mapping):
+                raise ValueError(f"profile {profile_arg} is absent from provider policy")
+            requested_provider = task.provider_override
+            if not requested_provider or not task.model_override:
+                raise ValueError("policy-bound overrides require both provider and model")
+            provider_selection = select_provider(
+                policy,
+                profile=profile_arg,
+                role=str(profile_data["role"]),
+                requested_provider=requested_provider,
+                requested_model=task.model_override,
+                available_models=load_available_models(os.environ.get("HERMES_KANBAN_AVAILABLE_MODELS_JSON")),
+                credential_source_class=os.environ.get(
+                    "HERMES_KANBAN_CREDENTIAL_SOURCE_CLASS",
+                    str(profile_data.get("credential_source_class", "")),
+                ),
+            )
+            spawn_model = provider_selection.effective_model
+            spawn_provider = provider_selection.effective_provider
+        except (OSError, ValueError, TypeError) as error:
+            raise RuntimeError(f"kanban provider policy preflight failed: {error}") from error
 
     prompt = f"work kanban task {task.id}"
     env = dict(os.environ)
@@ -9117,8 +9184,8 @@ def _default_spawn(
         for sk in task.skills:
             if sk:
                 cmd.extend(["--skills", sk])
-    if task.model_override:
-        cmd.extend(["-m", task.model_override])
+    if spawn_model:
+        cmd.extend(["-m", spawn_model])
         # Pin the provider too when the override names one, so the worker
         # resolves the model against the intended backend instead of the
         # profile's configured provider (mixing model X with provider Y is
@@ -9151,6 +9218,18 @@ def _default_spawn(
     log_dir = worker_logs_dir(board=board)
     log_dir.mkdir(parents=True, exist_ok=True)
     log_path = log_dir / f"{task.id}.log"
+    if policy_path:
+        env["HERMES_KANBAN_PROVIDER_SELECTION_AUDIT"] = str(
+            log_dir / f"{task.id}.provider-selection.json"
+        )
+    if provider_selection is not None:
+        from dataclasses import asdict
+
+        selection_audit = asdict(provider_selection)
+        selection_audit_path = Path(env["HERMES_KANBAN_PROVIDER_SELECTION_AUDIT"])
+        selection_audit_path.write_text(json.dumps(selection_audit, sort_keys=True) + "\n", encoding="utf-8")
+        env["HERMES_KANBAN_PROVIDER_SELECTION_JSON"] = json.dumps(selection_audit, sort_keys=True)
+        env["HERMES_KANBAN_PROVIDER_SELECTION_AUDIT"] = str(selection_audit_path)
     rotate_bytes, backup_count = worker_log_rotation_config()
     _rotate_worker_log(log_path, rotate_bytes, backup_count)
 
