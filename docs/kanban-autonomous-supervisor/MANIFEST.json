@@ -1,22 +1,20 @@
 {
   "document_type": "kanban_autonomous_supervisor_manifest",
   "schema_version": "1.0.0",
-  "generated_at": "2026-08-03T22:57:00+02:00",
+  "generated_at": "2026-08-03T23:03:00+02:00",
   "repository": "arumihsnek/hermes-agent",
   "official_upstream_reference": "NousResearch/hermes-agent",
   "default_branch": "main",
-  "published_head": "337d698e1affa5a0195da641a74e8a1fa42ac3a8",
+  "published_head": "734529568fa094ceabbe95aaf0bbc8c0e7e1abad",
   "mission_id": "kanban-autonomous-supervisor",
   "mission_complete": false,
-  "current_phase": "R7",
+  "current_phase": "operational_acceptance",
   "active_delivery": {
-    "type": "pull_request",
-    "number": 20,
-    "state": "open",
-    "head_branch": "codex/kanban-adoption-hardening",
-    "head_sha": "1d20e08490c3e7b6def43a9e57b0e3cd47c127a4",
-    "base_branch": "main",
-    "base_sha": "337d698e1affa5a0195da641a74e8a1fa42ac3a8"
+    "type": "post_merge_acceptance",
+    "r7_pr": 20,
+    "r7_feature_sha": "1d20e08490c3e7b6def43a9e57b0e3cd47c127a4",
+    "r7_merge_sha": "734529568fa094ceabbe95aaf0bbc8c0e7e1abad",
+    "state": "implementation_merged_operational_acceptance_pending"
   },
   "phases": [
     {
@@ -78,9 +76,10 @@
     {
       "id": "R7",
       "name": "adoption hardening",
-      "status": "open_pr",
+      "status": "merged",
       "pr": 20,
-      "head_sha": "1d20e08490c3e7b6def43a9e57b0e3cd47c127a4",
+      "feature_sha": "1d20e08490c3e7b6def43a9e57b0e3cd47c127a4",
+      "merge_sha": "734529568fa094ceabbe95aaf0bbc8c0e7e1abad",
       "focused_tests_reported": 18
     }
   ],
@@ -94,7 +93,7 @@
       "path": "hermes_cli/kanban_supervisor.py",
       "phase": "R3",
       "status": "merged",
-      "r7_changes": "open_pr"
+      "r7_changes": "merged"
     },
     {
       "path": "hermes_cli/kanban_human_gate.py",
@@ -114,7 +113,7 @@
     {
       "path": "tests/hermes_cli/test_kanban_hardening.py",
       "phase": "R7",
-      "status": "open_pr"
+      "status": "merged"
     }
   ],
   "tables": [
@@ -166,5 +165,5 @@
     "ROADMAP.md",
     "historical reports"
   ],
-  "next_safe_action": "Review PR #20 against ROADMAP.md R7 acceptance gates; do not mark the mission complete from focused tests alone."
+  "next_safe_action": "Audit merged R7 runtime enforcement, then execute real chat, process-handoff, self-hosting, and controlled live-adoption canaries."
 }
