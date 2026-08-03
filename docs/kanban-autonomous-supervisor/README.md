@@ -3,33 +3,35 @@
 > Canonical documentation set for the long-running Kanban mission supervisor in
 > `arumihsnek/hermes-agent`.
 >
-> Snapshot time: `2026-08-03T23:15:00+02:00`  
-> Repository `main`: `163b8dd488b77d4cf0ba19ab04d47e42a9c03bac`  
+> Snapshot time: `2026-08-03T23:28:00+02:00`  
+> Verification target: merged `personal-product/main`  
 > Runtime implementation head: `734529568fa094ceabbe95aaf0bbc8c0e7e1abad`  
-> Latest delivery: R7 merged by PR #20 at `734529568fa094ceabbe95aaf0bbc8c0e7e1abad`
+> Latest verification: `239/239 passed, RC=0`
 
 ## Read this first
 
 1. [`STATUS.md`](STATUS.md) — what is implemented, merged, active, and still unproven.
 2. [`SPEC.md`](SPEC.md) — current technical contract, invariants, modules, tables, and APIs.
 3. [`ROADMAP.md`](ROADMAP.md) — where the project came from and the remaining acceptance gates.
-4. [`CHECKPOINTS.md`](CHECKPOINTS.md) — phase-by-phase durable ledger with PRs and SHAs.
-5. [`EVIDENCE.md`](EVIDENCE.md) — claim-to-test and claim-to-commit matrix.
-6. [`CHANGELOG.md`](CHANGELOG.md) — chronological history.
-7. [`MANIFEST.json`](MANIFEST.json) — machine-readable project state and document manifest.
+4. [`CHECKPOINTS-CURRENT.md`](CHECKPOINTS-CURRENT.md) — current durable checkpoint and exact 239-test verification.
+5. [`CHECKPOINTS.md`](CHECKPOINTS.md) — historical phase-by-phase ledger retained for continuity.
+6. [`EVIDENCE.md`](EVIDENCE.md) — claim-to-test and claim-to-commit matrix.
+7. [`CHANGELOG.md`](CHANGELOG.md) — chronological history.
+8. [`MANIFEST.json`](MANIFEST.json) — machine-readable project state and document manifest.
 
 ## Source-of-truth order
 
 When documents disagree, use this precedence:
 
-1. Code and migrations in the exact published commit.
+1. Code and migrations in the exact published runtime commit.
 2. Durable SQLite state for a concrete mission instance.
 3. Git commits and merged PR metadata.
 4. [`MANIFEST.json`](MANIFEST.json).
-5. [`STATUS.md`](STATUS.md).
-6. [`SPEC.md`](SPEC.md).
-7. [`ROADMAP.md`](ROADMAP.md).
-8. Historical phase reports and PR descriptions.
+5. [`CHECKPOINTS-CURRENT.md`](CHECKPOINTS-CURRENT.md).
+6. [`STATUS.md`](STATUS.md).
+7. [`SPEC.md`](SPEC.md).
+8. [`ROADMAP.md`](ROADMAP.md).
+9. Historical phase reports and PR descriptions.
 
 PR descriptions and commit messages are evidence, but they are not normative APIs.
 Historical full-suite totals are not directly comparable unless the exact pytest command
@@ -43,10 +45,24 @@ and collected test set are identical.
 - R5 roadmap executor: merged.
 - R6 component-level end-to-end canary: merged.
 - R7 adoption hardening: merged in PR #20.
-- The implementation roadmap R2–R7 is merged, but the original objective is **not yet fully accepted** because the published canary
-  simulates senior consultation and human response inside a test process. A real Hermes
-  chat transport, a true process/session handoff, and controlled operational adoption
-  remain explicit acceptance gates.
+- Fresh combined focused verification: **239/239 passed, RC=0**.
+- The implementation roadmap R2–R7 is merged, but the original objective is **not yet fully accepted** because the published canary simulates senior consultation and human response inside a test process. A real Hermes chat transport, a true process/session handoff, self-hosting, and controlled operational adoption remain explicit acceptance gates.
+
+## Canonical test breakdown
+
+```text
+R2 mission-state       108
+R3 supervisor           55
+R4 human gate           33
+R5 roadmap executor     18
+R6 canary                 7
+R7 hardening             18
+                        ---
+Total                   239
+```
+
+The former R2 figure of 138 included 30 additional Kanban DB tests. It is retained as
+historical evidence but is not used in the non-overlapping R2–R7 aggregate.
 
 ## Repository boundaries
 
@@ -62,3 +78,5 @@ and collected test set are identical.
   phase roadmap and links back to this canonical set.
 - `docs/plans/r3-roadmap-bundle.json` is a historical architecture-consultation bundle.
   It must not be treated as live status.
+- `CHECKPOINTS.md` is retained as the original cumulative ledger. New resumptions should
+  use `CHECKPOINTS-CURRENT.md` as the active checkpoint.
