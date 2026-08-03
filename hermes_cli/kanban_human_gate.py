@@ -242,7 +242,7 @@ class FilesystemTransport(HumanGateTransport):
         import os
         os.makedirs(self._base_dir, exist_ok=True)
         path = os.path.join(self._base_dir, f"{gate.gate_id}.json")
-        with open(path, "w") as f:
+        with open(path, "w", encoding="utf-8") as f:
             json.dump({
                 "gate_id": gate.gate_id,
                 "mission_id": gate.mission_id,
@@ -258,7 +258,7 @@ class FilesystemTransport(HumanGateTransport):
         path = os.path.join(self._base_dir, f"{gate_id}_response.json")
         if not os.path.exists(path):
             return None
-        with open(path) as f:
+        with open(path, encoding="utf-8") as f:
             return json.load(f)
 
 
