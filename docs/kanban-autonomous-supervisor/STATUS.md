@@ -1,8 +1,9 @@
 # Current Project Status
 
-> Status snapshot: `2026-08-03T22:57:00+02:00`  
+> Status snapshot: `2026-08-03T23:15:00+02:00`  
 > Repository: `arumihsnek/hermes-agent`  
-> Published `main`: `734529568fa094ceabbe95aaf0bbc8c0e7e1abad`  
+> Repository `main`: `163b8dd488b77d4cf0ba19ab04d47e42a9c03bac`  
+> Runtime implementation head: `734529568fa094ceabbe95aaf0bbc8c0e7e1abad`  
 > Latest merged PR: `#20 feat: R7 adoption hardening`  
 > R7 merge: `734529568fa094ceabbe95aaf0bbc8c0e7e1abad`
 
@@ -85,7 +86,7 @@ Mission acceptance nevertheless remains incomplete until the real-world gates be
 - Non-destructive mission test.
 - Additive rollback-safety tests.
 
-R7 is part of `main` at merge commit `734529568fa094ceabbe95aaf0bbc8c0e7e1abad`.
+R7 is part of the runtime implementation at merge commit `734529568fa094ceabbe95aaf0bbc8c0e7e1abad`.
 
 ## What is still unproven
 
